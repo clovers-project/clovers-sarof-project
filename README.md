@@ -311,6 +311,10 @@ luckey_coin = [ 2000, 100000,]
 
 不指定报价时，下次市场刷新会按照自动价格全部出售
 
+</details>
+
+</details>
+
 <details>
   
 <summary>道具系统</summary>
