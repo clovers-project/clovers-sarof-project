@@ -21,6 +21,7 @@ _✨ 改自 [nonebot_plugin_russian](https://github.com/HibiKier/nonebot_plugin_
 ## 💿 安装
 
 <details open>
+
 <summary>pip</summary>
 
 ```bash
@@ -30,15 +31,20 @@ pip install clovers_leafgame
 </details>
 
 <details>
+
 <summary>poetry</summary>
 
 ```bash
 poetry add clovers_leafgame
 ```
 
+</details>
+
 ## ⚙️ 配置
 
-在 clovers 配置文件内按需添加下面的配置项
+<details open>
+
+<summary>在 clovers 配置文件内按需添加下面的配置项</summary>
 
 ```toml
 [clovers_leafgame]
@@ -94,19 +100,21 @@ packet_gold = [ 200, 2000,]
 luckey_coin = [ 2000, 100000,]
 ```
 
+</details>
+
 **默认资料卡背景**
 
-首次运行本插件之后，会出现 `/data/russian/BG_image/` 这个路径。
+首次运行本插件之后，会出现 `/data/LeafGames/BG_image/` (或者你指定的) 这个路径。
 
-插件生成了一个非常 defaul 的 default.png，如果不配置的话，所有人的资料卡背景图片就是这张图了。
+你需要往这个文件夹下添加一个 `default.png` 的图片，所有人的默认资料卡背景图片就是这张图了。
 
-随便拖进去一张图片命名为 default.png，这张图就会作为默认资料卡背景。
+如果不配置的话，就是纯色（ ~~高性能模式~~ ）。
 
 改图片的时候不用关 bot 也会生效
 
 ## 🎉 使用
 
-里面的所有游戏都需要使用金币作为赌注！
+游戏可以使用道具作为赌注！
 注：同一时间群内只能有一场对决
 
 <details>

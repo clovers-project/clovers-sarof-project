@@ -4,7 +4,7 @@ from pathlib import Path
 
 class Config(BaseModel):
     # 主路径
-    main_path: str = str(Path("LiteGames").absolute())
+    main_path: str = str(Path("LeafGames").absolute())
     # 默认显示字体
     fontname = "simsun"
     # 默认备用字体
