@@ -1,173 +1,97 @@
 <!-- markdownlint-disable MD031 MD033 MD036 MD041 -->
 
-<div align="center">
-
-<a href="https://v2.nonebot.dev/store">
-  <img src="https://raw.githubusercontent.com/A-kirami/nonebot-plugin-template/resources/nbp_logo.png" width="180" height="180" alt="NoneBotPluginLogo">
-</a>
-
-<p>
-  <img src="https://raw.githubusercontent.com/A-kirami/nonebot-plugin-template/resources/NoneBotPlugin.svg" width="240" alt="NoneBotPluginText">
-</p>
-
-# nonebot-plugin-game-collection
+# clovers_leafgame
 
 _✨ 改自 [nonebot_plugin_russian](https://github.com/HibiKier/nonebot_plugin_russian) 和 [nonebot_plugin_horserace](https://github.com/shinianj/nonebot_plugin_horserace) 的小游戏合集 ✨_
 
-<img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="python">
+<div align="center">
+<img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="python">
 <a href="./LICENSE">
-  <img src="https://img.shields.io/github/license/KarisAya/nonebot_plugin_game_collection.svg" alt="license">
+  <img src="https://img.shields.io/github/license/KarisAya/clovers_leafgame.svg" alt="license">
 </a>
-<a href="https://pypi.python.org/pypi/nonebot_plugin_game_collection">
-  <img src="https://img.shields.io/pypi/v/nonebot_plugin_game_collection.svg" alt="pypi">
+<a href="https://pypi.python.org/pypi/clovers_leafgame">
+  <img src="https://img.shields.io/pypi/v/clovers_leafgame.svg" alt="pypi">
 </a>
-<a href="https://pypi.python.org/pypi/nonebot_plugin_game_collection">
-  <img src="https://img.shields.io/pypi/dm/nonebot_plugin_game_collection" alt="pypi download">
+<a href="https://pypi.python.org/pypi/clovers_leafgame">
+  <img src="https://img.shields.io/pypi/dm/clovers_leafgame" alt="pypi download">
 </a>
 
 </div>
 
 ## 💿 安装
 
-以下提到的方法 任选**其一** 即可
-
 <details open>
-<summary>[推荐] 使用 nb-cli 安装</summary>
-在 nonebot2 项目的根目录下打开命令行, 输入以下指令即可安装
-
-```bash
-nb plugin install nonebot_plugin_game_collection
-```
-
-</details>
-
-<details>
-<summary>使用包管理器安装</summary>
-在 nonebot2 项目的插件目录下, 打开命令行, 根据你使用的包管理器, 输入相应的安装命令
-
-<details>
 <summary>pip</summary>
 
 ```bash
-pip install nonebot_plugin_game_collection
+pip install clovers_leafgame
 ```
 
 </details>
-<details>
-<summary>pdm</summary>
 
-```bash
-pdm add nonebot_plugin_game_collection
-```
-
-</details>
 <details>
 <summary>poetry</summary>
 
 ```bash
-poetry add nonebot_plugin_game_collection
+poetry add clovers_leafgame
 ```
-
-</details>
-<details>
-<summary>conda</summary>
-
-```bash
-conda install nonebot_plugin_game_collection
-```
-
-</details>
-
-打开 nonebot2 项目根目录下的 `pyproject.toml` 文件, 在 `[tool.nonebot]` 部分的 `plugins` 项里追加写入
-
-```toml
-[tool.nonebot]
-plugins = [
-    # ...
-    "nonebot_plugin_game_collection"
-]
-```
-
-</details>
 
 ## ⚙️ 配置
 
-在 NoneBot2 项目的 `.env` 文件中按需添加下面的配置项
+在 clovers 配置文件内按需添加下面的配置项
 
-```properties
+```toml
+[clovers_leafgame]
+# 主路径
+main_path = "D:\\linbot\\LiteGames"
+# 默认显示字体
+fontname = "simsun"
+# 默认备用字体
+fallback_fonts = [ "Arial", "Tahoma", "Microsoft YaHei", "Segoe UI", "Segoe UI Emoji", "Segoe UI Symbol", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Source Han Sans SC", "Noto Sans SC", "Noto Sans CJK JP", "WenQuanYi Micro Hei", "Apple Color Emoji", "Noto Color Emoji",]
+
+["clovers_leafgame.modules.account"]
 # 每日签到的范围
-sign_gold = [200, 500]
+sign_gold = [ 200, 500,]
+# 标记字符串（不要动）
+clovers_marking = "ＬＵＣＫＹ ＣＬＯＶＥＲ"
+revolution_marking = " ＣＡＰＩＴＡＬＩＳＴ "
+debug_marking = "  ＯＦＦＩＣＩＡＬ  "
 
-# 每日补贴的范围
-security_gold = [100, 300]
+["clovers_leafgame.modules.game"]
+# 超时时间
+timeout = 60
+# 默认赌注
+default_bet = 200
 
-# 重置签到的范围
-revolt_gold = [1000, 2000]
+["clovers_leafgame.modules.game.horse_race"]
+# 玩家人数范围
+range_of_player_numbers = [ 2, 8,]
+# 跑道长度
+setting_track_length = 30
+# 随机位置事件，能够随机到的跑道范围
+random_move_range = [ 0, 0.8,]
+# 每回合基础移动范围
+base_move_range = [ 1, 3,]
+# 事件概率
+event_randvalue = 450
 
+["clovers_leafgame.modules.market"]
 # 重置冷却时间，设置为0禁用发起重置
 revolt_cd = 28800
-
 # 重置的基尼系数
 revolt_gini = 0.68
+# 重置签到的范围
+revolt_gold = [ 1000, 2000,]
+# 注册公司金币数
+company_public_gold = 20000
 
-# 最大赌注
-max_bet_gold = 2000
-
-# 默认赌注
-bet_gold = 200
-
-# 单抽所需金币
+["clovers_leafgame.modules.prop"]
+# 抽卡所需金币
 gacha_gold = 50
-
-# 一个测试字符串，不要动（
-lucky_clover = "• ＬＵＣＫＹ  ＣＬＯＶＥＲ •"
-
-# 默认显示字体
-game_fontname = "simsun"
-
-# 默认备用字体
-game_fallback_fonts = [
-    "Arial",
-    "Tahoma",
-    "Microsoft YaHei",
-    "Segoe UI",
-    "Segoe UI Emoji",
-    "Segoe UI Symbol",
-    "Helvetica Neue",
-    "PingFang SC",
-    "Hiragino Sans GB",
-    "Source Han Sans SC",
-    "Noto Sans SC",
-    "Noto Sans CJK JP",
-    "WenQuanYi Micro Hei",
-    "Apple Color Emoji",
-    "Noto Color Emoji",
-    ]
-
-# 跑道长度
-setting_track_length = 20
-
-# 随机位置事件，最小能到的跑道距离
-setting_random_min_length = 0
-
-# 随机位置事件，最大能到的跑道距离
-setting_random_max_length = 15
-
-# 每回合基础移动力最小值
-base_move_min = 1
-
-# 每回合基础移动力最大值
-base_move_max = 3
-
-# 最大支持玩家数
-max_player = 8
-
-# 最少玩家数
-min_player = 2
-
-# 事件概率 = event_rate / 1000
-event_rate = 450
-
+# 礼包金币范围
+packet_gold = [ 200, 2000,]
+# 幸运硬币赌注范围
+luckey_coin = [ 2000, 100000,]
 ```
 
 **默认资料卡背景**

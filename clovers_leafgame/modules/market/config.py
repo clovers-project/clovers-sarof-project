@@ -8,5 +8,5 @@ class Config(BaseModel):
     revolt_gini: float = 0.68
     # 重置签到的范围
     revolt_gold: tuple[int, int] = (1000, 2000)
-    # 最大赌注
+    # 注册公司金币数
     company_public_gold: int = 20000
