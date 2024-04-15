@@ -666,6 +666,8 @@ ACE 技能：摇一个 6 面骰子，把打出的 ACE 牌点替换成摇出的�
 
 </details>
 
+</details>
+
 <details>
 
 <summary>私聊关联群聊账户</summary>
