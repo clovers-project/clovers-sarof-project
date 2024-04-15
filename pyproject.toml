@@ -7,6 +7,10 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
+clovers = {extras = ["linecard", "tools"], version = "^0.1.1"}
+pydantic = "^2.7.0"
+mplfinance = "^0.12.10b0"
+clovers-apscheduler = "^0.1.0"
 
 
 [build-system]

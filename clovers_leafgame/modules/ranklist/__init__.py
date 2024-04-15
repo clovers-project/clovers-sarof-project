@@ -1,4 +1,3 @@
-import re
 import heapq
 import asyncio
 from collections import Counter
