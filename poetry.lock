@@ -23,8 +23,10 @@ files = [
 ]
 
 [package.dependencies]
+exceptiongroup = {version = ">=1.0.2", markers = "python_version < \"3.11\""}
 idna = ">=2.8"
 sniffio = ">=1.1"
+typing-extensions = {version = ">=4.1", markers = "python_version < \"3.11\""}
 
 [package.extras]
 doc = ["Sphinx (>=7)", "packaging", "sphinx-autodoc-typehints (>=1.2.0)", "sphinx-rtd-theme"]
@@ -72,13 +74,13 @@ files = [
 
 [[package]]
 name = "clovers"
-version = "0.1.1"
+version = "0.1.2"
 description = ""
 optional = false
-python-versions = "<4.0,>=3.12"
+python-versions = "<4.0,>=3.10"
 files = [
-    {file = "clovers-0.1.1-py3-none-any.whl", hash = "sha256:a9cdfbedea1e2bc32af648f5ffcca1ff34f7b635d6607cccf454c1e4353d2257"},
-    {file = "clovers-0.1.1.tar.gz", hash = "sha256:650ccaf1ea547eff4491d7a0e0310fc1bb408c2d49176789aecd821f1c12e0aa"},
+    {file = "clovers-0.1.2-py3-none-any.whl", hash = "sha256:87ee3371e8656a3c7bc87b75ef0100c53f48348582cd9a93e3b20de2a0d7fe06"},
+    {file = "clovers-0.1.2.tar.gz", hash = "sha256:29311cbb16a529e8b40ed52b3119b82f5be1c2e72b27bb373cdbf6a319031e2c"},
 ]
 
 [package.dependencies]
@@ -95,18 +97,19 @@ tools = ["httpx (>=0.27.0,<0.28.0)", "numpy (>=1.26.4,<2.0.0)"]
 
 [[package]]
 name = "clovers-apscheduler"
-version = "0.1.0"
+version = "0.1.2"
 description = ""
 optional = false
-python-versions = "<4.0,>=3.12"
+python-versions = "<4.0,>=3.10"
 files = [
-    {file = "clovers_apscheduler-0.1.0-py3-none-any.whl", hash = "sha256:6b3f1f2f08680b77a6471168ae7691c2eb701b8806da5e65e239449a8560e7ea"},
-    {file = "clovers_apscheduler-0.1.0.tar.gz", hash = "sha256:cbe9ad5544b9f14dcc5343161bfc64be1d30e5917baabf400024b3377d0d2297"},
+    {file = "clovers_apscheduler-0.1.2-py3-none-any.whl", hash = "sha256:599d470bc240b97825cd5b578256f5880dff41e53eaaa1526b3e5f31ae2e52d9"},
+    {file = "clovers_apscheduler-0.1.2.tar.gz", hash = "sha256:c8df1edaa6c5819a2445fffcd6ffd0283a84d79f99659420fa0d249491ed29e4"},
 ]
 
 [package.dependencies]
 apscheduler = ">=3.10.4,<4.0.0"
-clovers = ">=0.1.0,<0.2.0"
+clovers = ">=0.1.2,<0.2.0"
+pydantic = ">=2.7.0,<3.0.0"
 
 [[package]]
 name = "contourpy"
@@ -185,6 +188,20 @@ files = [
 [package.extras]
 docs = ["ipython", "matplotlib", "numpydoc", "sphinx"]
 tests = ["pytest", "pytest-cov", "pytest-xdist"]
+
+[[package]]
+name = "exceptiongroup"
+version = "1.2.0"
+description = "Backport of PEP 654 (exception groups)"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "exceptiongroup-1.2.0-py3-none-any.whl", hash = "sha256:4bfd3996ac73b41e9b9628b04e079f193850720ea5945fc96a08633c66912f14"},
+    {file = "exceptiongroup-1.2.0.tar.gz", hash = "sha256:91f5c769735f051a4290d52edd0858999b57e5876e9f85937691bd4c9fa3ed68"},
+]
+
+[package.extras]
+test = ["pytest (>=6)"]
 
 [[package]]
 name = "fonttools"
@@ -587,7 +604,11 @@ files = [
 ]
 
 [package.dependencies]
-numpy = {version = ">=1.26.0", markers = "python_version >= \"3.12\""}
+numpy = [
+    {version = ">=1.22.4", markers = "python_version < \"3.11\""},
+    {version = ">=1.23.2", markers = "python_version == \"3.11\""},
+    {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
+]
 python-dateutil = ">=2.8.2"
 pytz = ">=2020.1"
 tzdata = ">=2022.7"
@@ -926,5 +947,5 @@ devenv = ["check-manifest", "pytest (>=4.3)", "pytest-cov", "pytest-mock (>=3.3)
 
 [metadata]
 lock-version = "2.0"
-python-versions = "^3.12"
-content-hash = "44a0a112780f4f5997a17c74589039b28a2d0d7d20c6b49281426862862a950a"
+python-versions = "^3.10"
+content-hash = "cbf486881db923be84c07c4dafc21c9b5dba0a8fa2f0e5dae74766e3a76cb26d"
