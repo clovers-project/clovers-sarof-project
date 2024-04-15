@@ -671,25 +671,30 @@ def blackjack_end(session: Session):
     return session.end(output)
 
 
-@plugin.handle({"抽牌"}, {"user_id", "group_id"})
+@plugin.handle({"抽牌"}, {"user_id", "group_id", "send_group_message"})
 @blackjack.action(place)
 async def _(event: Event, session: Session):
     hand, pt = blackjack_hit(session)
     msg = f"你的手牌：\n{poker_show(hand,'\n')}\n合计:{pt}点"
     if pt > 21:
-        return session.end(msg)
+        await event.send_group_message(
+            session.group_id,
+            plugin.build_result(session.end(msg)),
+        )
     if not event.is_private():
         msg = "请在私信抽牌\n" + msg
     return msg
 
 
-@plugin.handle({"停牌"}, {"user_id", "group_id"})
+@plugin.handle({"停牌"}, {"user_id", "group_id", "send_group_message"})
 @blackjack.action(place)
 async def _(event: Event, session: Session):
     if session.round == 1:
         session.nextround()
-        return f"请{session.p2_nickname}抽牌|停牌|双倍停牌"
-    return blackjack_end(session)
+        result = f"请{session.p2_nickname}抽牌|停牌|双倍停牌"
+    else:
+        result = blackjack_end(session)
+    await event.send_group_message(session.group_id, plugin.build_result(result))
 
 
 @plugin.handle({"双倍停牌"}, {"user_id", "group_id"})
@@ -702,14 +707,10 @@ async def _(event: Event, session: Session):
     session.nextround()
     msg = f"你的手牌：\n{poker_show(hand,'\n')}\n合计:{pt}点"
     if pt > 21:
-        return session.end(msg)
-
-    async def result():
-        yield msg
-        await asyncio.sleep(1)
-        yield f"请{session.p2_nickname}抽牌|停牌|双倍停牌"
-
-    return result()
+        await event.send_group_message(session.group_id, plugin.build_result(session.end(msg)))
+    else:
+        await event.send_group_message(session.group_id, plugin.build_result(f"请{session.p2_nickname}{blackjack.action_tip}"))
+        return msg
 
 
 western_duel = Game("西部对战", "装弹|开枪|闪避|闪避开枪|预判开枪")
@@ -871,7 +872,7 @@ def buckshot_roulette_random_bullet(bullet_num: int):
 
 
 def buckshot_roulette_random_props(props_num: int):
-    prop_list = ["手铐", "短锯", "放大镜", "香烟", "啤酒","逆转器","过期药品","箱子"]
+    prop_list = ["手铐", "短锯", "放大镜", "香烟", "啤酒", "逆转器", "过期药品", "箱子"]
     return random.choices(prop_list, k=props_num)
 
 
@@ -953,10 +954,10 @@ async def _(event: Event, session: Session):
     session.data["bullet"] = bullet
     result.append(f"玩家{session.p1_nickname}血量:{session.data['HP1']}")
     result.append("道具：")
-    result.append(" ".join(f"{k} {v}" for k,v in Counter(session.data["props1"]).items()))
+    result.append(" ".join(f"{k} {v}" for k, v in Counter(session.data["props1"]).items()))
     result.append(f"玩家{session.p2_nickname}血量:{session.data['HP2']}")
     result.append("道具：")
-    result.append(" ".join(f"{k} {v}" for k,v in Counter(session.data["props2"]).items()))
+    result.append(" ".join(f"{k} {v}" for k, v in Counter(session.data["props2"]).items()))
     next_name = session.p1_nickname if session.next == session.p1_uid else session.p2_nickname
     result.append(f"请下一位玩家：{next_name}\n{buckshot_roulette.action_tip}")
     return "\n".join(result)
@@ -987,9 +988,9 @@ async def _(event: Event, session: Session):
         "放大镜": "查看本发子弹",
         "香烟": "增加1点血量",
         "啤酒": "退一发子弹",
-        "逆转器":"转换当前枪膛里面的子弹真假",
-        "过期药品":"40%的概率回两滴血，剩下的概率扣一滴血",
-        "箱子": "每人抽取一件道具"
+        "逆转器": "转换当前枪膛里面的子弹真假",
+        "过期药品": "40%的概率回两滴血，剩下的概率扣一滴血",
+        "箱子": "每人抽取一件道具",
     }
     if event.user_id == session.p1_uid:
         hp_self = "HP1"
@@ -1009,7 +1010,7 @@ async def _(event: Event, session: Session):
     if prop_key not in session.data[props_self]:
         return f"你未持有道具{prop_key}"
     session.data[props_self].remove(prop_key)
-    tips = prop_tips.get(prop_key,"")
+    tips = prop_tips.get(prop_key, "")
     match event.single_arg():
         case "手铐":
             session.data[buff].append("手铐")
@@ -1017,16 +1018,16 @@ async def _(event: Event, session: Session):
             if session.data["bullet"][0] != 0:
                 session.data["bullet"][0] = 2
         case "放大镜":
-            tips += f"\n本发是{'空弹' if session.data["bullet"][0] == 0 else '实弹'}"
+            tips += f"\n本发是{'空弹' if session.data['bullet'][0] == 0 else '实弹'}"
         case "香烟":
             session.data[hp_self] += 1
-            session.data[hp_self] = min(session.data[hp_self],session.data["HP_MAX"])
+            session.data[hp_self] = min(session.data[hp_self], session.data["HP_MAX"])
             tips += f"\n你的血量：{session.data[hp_self]}"
         case "啤酒":
             bullet = session.data["bullet"]
             if len(bullet) < 2:
                 return "不可退掉最后一发子弹。"
-            bullet_name = '空弹' if bullet[0] == 0 else '实弹'
+            bullet_name = "空弹" if bullet[0] == 0 else "实弹"
             tips += f"\n你退掉了一发{bullet_name}"
             session.data["bullet"] = bullet[1:]
         case "逆转器":
@@ -1034,10 +1035,10 @@ async def _(event: Event, session: Session):
             bullet[0] == 1 if bullet[0] == 0 else 0
             session.data["bullet"] = bullet
         case "过期药品":
-            if random.randint(1,10) <= 4:
+            if random.randint(1, 10) <= 4:
                 tips += "\n你增加了2滴血"
                 session.data[hp_self] += 2
-                session.data[hp_self] = min(session.data[hp_self],session.data["HP_MAX"])
+                session.data[hp_self] = min(session.data[hp_self], session.data["HP_MAX"])
             else:
                 tips += "\n你减少了1滴血"
                 session.data[hp_self] -= 1
@@ -1045,7 +1046,7 @@ async def _(event: Event, session: Session):
                     session.win = session.p1_uid if hp_self == "HP2" else session.p2_uid
                     return session.end(tips)
         case "箱子":
-            prop1,prop2 = buckshot_roulette_random_props(2)
+            prop1, prop2 = buckshot_roulette_random_props(2)
             tips += f"\n你获得了{prop1}\n对方获得了{prop2}"
             session.data[props_self].append(prop1)
             session.data[props_self] = session.data[props_self][:8]
@@ -1055,8 +1056,6 @@ async def _(event: Event, session: Session):
             return
     session.delay(60)
     return tips
-
-
 
 
 from .horse_race import RaceWorld
@@ -1113,6 +1112,9 @@ async def _(event: Event):
     async def result():
         if session.bet:
             prop, n = session.bet
+            for horse in world.racetrack:
+                bank = prop.locate_bank(*manager.locate_account(horse.playeruid, group_id))
+                bank[prop.id] -= n
             tip = f"\n> 当前奖金：{n}{prop.name}"
         else:
             tip = ""
@@ -1135,12 +1137,22 @@ async def _(event: Event):
             if winer := [horse for horse in world.racetrack if horse.location >= world.track_length]:
                 yield f"> 比赛结束\n> {event.event.kwargs['Bot_Nickname']}正在为您生成战报..."
                 await asyncio.sleep(1)
-                winer_list = []
-                for win_horse in winer:
-                    winer_list.append(f"> {win_horse.player}")
+                if session.bet:
+                    winer_list = []
+                    prop, n = session.bet
+                    n = int(n * len(world.racetrack) / len(winer))
+                    for win_horse in winer:
+                        winer_list.append(f"> {win_horse.player}")
+                        bank = prop.locate_bank(*manager.locate_account(horse.playeruid, group_id))
+                        bank[prop.id] += n
+                    bet = f"\n奖金：{n}{prop.name}"
+                else:
+                    winer_list = [f"> {win_horse.player}" for win_horse in winer]
+                    bet = ""
+
                 winer_list = "\n".join(winer_list)
                 session.time = 0
-                yield f"> 比赛已结束，胜者为：\n{winer_list}"
+                yield f"> 比赛已结束，胜者为：\n{winer_list}{bet}"
                 return
             await asyncio.sleep(1)
 

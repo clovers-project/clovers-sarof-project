@@ -17,7 +17,7 @@ def rank_title(title) -> Callable[[str], int] | None:
             return lambda locate_id: manager.data.extra.setdefault("win_achieve", Counter())[locate_id]
         case "败场":
             return lambda locate_id: manager.data.extra.setdefault("lose", Counter())[locate_id]
-        case "败场":
+        case "连败":
             return lambda locate_id: manager.data.extra.setdefault("lose_achieve", Counter())[locate_id]
 
 
