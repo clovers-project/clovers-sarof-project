@@ -357,8 +357,10 @@ async def _():
                 settle = n
             if settle == 0:
                 continue
-            if settle < n:
+            elif settle < n:
                 stock.exchange[user_id] = (n - settle, quote)
+            else:
+                stock.exchange[user_id] = (0, 0)
             user.invest[stock.id] -= settle
             group.invest[stock.id] += settle
             user.bank[STD_GOLD.id] += int(value)
