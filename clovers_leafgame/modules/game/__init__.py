@@ -872,7 +872,7 @@ def buckshot_roulette_random_bullet(bullet_num: int):
 
 
 def buckshot_roulette_random_props(props_num: int):
-    prop_list = ["手铐", "短锯", "放大镜", "香烟", "啤酒", "逆转器", "过期药品", "箱子"]
+    prop_list = ["手铐", "短锯", "放大镜", "香烟", "啤酒", "逆转器", "过期药品", "肾上腺素", "手机", "箱子"]
     return random.choices(prop_list, k=props_num)
 
 
@@ -882,7 +882,6 @@ def buckshot_roulette_status(session: Session):
     result.append(f"玩家 {session.p1_nickname}[nowrap]\n[pixel][340]玩家 {session.p2_nickname}")
     heart = lambda n: f"血量 [nowrap]\n[color][red]{n * '♥'}"
     result.append(f"{heart(session.data['HP1'])}[nowrap]\n[pixel][340]{heart(session.data['HP2'])}")
-    result.append("道具 [nowrap]\n[pixel][340]道具 ")
     result.append("----")
     props1 = [f"{k} {v}" for k, v in Counter(session.data["props1"]).items()]
     props2 = [f"[pixel][340]{k} {v}" for k, v in Counter(session.data["props2"]).items()]
@@ -927,7 +926,7 @@ async def _(session: Session, arg: str):
     else:
         tip = ""
     session.start_tips = [buckshot_roulette_loading(session), buckshot_roulette_status(session)]
-    return f"恶魔轮盘场地已创建。{tip}\n{session.create_info()}"
+    return f"【恶魔轮盘】场地已创建。{tip}\n{session.create_info()}"
 
 
 @plugin.handle(r"向(自己|对方)开枪$", {"user_id", "group_id"})
@@ -986,93 +985,90 @@ async def _(event: Event, session: Session):
 @plugin.handle({"使用道具"}, {"user_id", "group_id"})
 @buckshot_roulette.action(place)
 async def _(event: Event, session: Session):
-    # """
-    # 手铐：让对方下一回合无法行动。
-    # 短锯：
-    # 放大镜：
-    # 香烟：
-    # 啤酒：
-    # 逆转器：转换当前枪膛里面的子弹真假
-    # 肾上脉素：偷取对方的道具并立即使用
-    # 过期药品：40%的概率回两滴血，剩下的概率扣一滴血
-    # 手机：可以知道第n发的子弹真假
-    # 眼罩：对家或自己下次射击有50%概率无效，50%概率伤害+1
-    # 治疗针：下颗子弹回复1点生命
-    # 吗啡：受到致死伤害时自动使用，免疫一次死亡
-    # 箱子：每人抽取一件道具
-    # """
-
-    prop_tips = {
-        "手铐": "对方一回合无法行动",
-        "短锯": "本发子弹伤害翻倍",
-        "放大镜": "查看本发子弹",
-        "香烟": "增加1点血量",
-        "啤酒": "退一发子弹",
-        "逆转器": "转换当前枪膛里面的子弹真假",
-        "过期药品": "50%的概率回两滴血，剩下的概率扣一滴血",
-        "箱子": "每人抽取一件道具",
-    }
-    if event.user_id == session.p1_uid:
-        hp_self = "HP1"
-        hp_others = "HP2"
-        buff = "buff1"
-        props_self = "props1"
-        props_others = "props2"
-    else:
-        hp_self = "HP2"
-        hp_others = "HP1"
-        buff = "buff2"
-        props_self = "props2"
-        props_others = "props1"
     prop_key = event.single_arg()
     if not prop_key:
         return
-    if prop_key not in session.data[props_self]:
-        return f"你未持有道具{prop_key}"
-    session.data[props_self].remove(prop_key)
-    tips = prop_tips.get(prop_key, "")
-    match event.single_arg():
-        case "手铐":
-            session.data[buff].add("手铐")
-        case "短锯":
-            session.data[buff].add("短锯")
-        case "放大镜":
-            tips += f"\n本发是{'空弹' if session.data['bullet'][0] == 0 else '实弹'}"
-        case "香烟":
-            session.data[hp_self] += 1
-            session.data[hp_self] = min(session.data[hp_self], session.data["HP_MAX"])
-            tips += f"\n你的血量：{session.data[hp_self]}"
-        case "啤酒":
-            bullet = session.data["bullet"]
-            if len(bullet) < 2:
-                return "不可退掉最后一发子弹。"
-            bullet_name = "空弹" if bullet[0] == 0 else "实弹"
-            tips += f"\n你退掉了一发{bullet_name}"
-            session.data["bullet"] = bullet[1:]
-        case "逆转器":
-            session.data["bullet"][0] = abs(session.data["bullet"][0] - 1)
-        case "过期药品":
-            if random.randint(0, 1) == 1:
-                tips += "\n你增加了2滴血"
-                session.data[hp_self] += 2
+    session.delay()
+
+    def use(session: Session, prop_key: str):
+        prop_tips = {
+            "手铐": "对方一回合无法行动",
+            "短锯": "本发子弹伤害翻倍",
+            "放大镜": "查看本发子弹",
+            "香烟": "增加1点血量",
+            "啤酒": "退一发子弹",
+            "逆转器": "转换当前枪膛里面的子弹真假",
+            "过期药品": "50%的概率回两滴血，剩下的概率扣一滴血",
+            "肾上腺素": "偷取对方的道具并立即使用",
+            "手机": "查看接下来第n发子弹真假",
+            "箱子": "每人抽取一件道具",
+        }
+        if session.next == session.p1_uid:
+            hp_self, hp_others, buff, props_self, props_others = "HP1", "HP2", "buff1", "props1", "props2"
+        else:
+            hp_self, hp_others, buff, props_self, props_others = "HP2", "HP1", "buff2", "props2", "props1"
+        if prop_key not in session.data[props_self]:
+            return f"你未持有道具【{prop_key}】"
+        session.data[props_self].remove(prop_key)
+        tips = "效果：" + prop_tips[prop_key]
+
+        match prop_key:
+            case "手铐" | "短锯":
+                session.data[buff].add(prop_key)
+            case "放大镜":
+                tips += f"\n本发是：{'空弹' if session.data['bullet'][0] == 0 else '实弹'}"
+            case "香烟":
+                session.data[hp_self] += 1
                 session.data[hp_self] = min(session.data[hp_self], session.data["HP_MAX"])
-            else:
-                tips += "\n你减少了1滴血"
-                session.data[hp_self] -= 1
-                if session.data[hp_self] <= 0:
-                    session.win = session.p1_uid if hp_self == "HP2" else session.p2_uid
-                    return session.end(tips)
-        case "箱子":
-            prop1, prop2 = buckshot_roulette_random_props(2)
-            tips += f"\n你获得了{prop1}\n对方获得了{prop2}"
-            session.data[props_self].append(prop1)
-            session.data[props_self] = session.data[props_self][:8]
-            session.data[props_others].append(prop2)
-            session.data[props_others] = session.data[props_others][:8]
-        case _:
-            return
-    session.delay(60)
-    return tips
+                tips += f"\n你的血量：{session.data[hp_self]}"
+            case "啤酒":
+                tips += f"\n你退掉了一发：{'空弹' if session.data['bullet'][0] == 0 else '实弹'}"
+                session.data["bullet"] = session.data["bullet"][1:]
+                if not session.data["bullet"]:
+                    return [f"最后一发子弹已被退出{tips}", buckshot_roulette_loading(session)]
+            case "逆转器":
+                session.data["bullet"][0] = 1 - session.data["bullet"][0]
+            case "过期药品":
+                if random.randint(0, 1) == 0:
+                    tips += "\n你减少了1滴血"
+                    session.data[hp_self] -= 1
+                    if session.data[hp_self] <= 0:
+                        session.win = session.p1_uid if hp_self == "HP2" else session.p2_uid
+                        return session.end(tips)
+                else:
+                    tips += "\n你增加了2滴血"
+                    session.data[hp_self] += 2
+                    session.data[hp_self] = min(session.data[hp_self], session.data["HP_MAX"])
+            case "肾上腺素":
+                if len(event.args) < 2:
+                    return tips + "使用失败，你未指定对方的道具"
+                inner_prop_key = event.args[1]
+                if inner_prop_key == prop_key:
+                    return tips + "使用失败，目标不能是肾上腺素"
+                if inner_prop_key not in session.data[props_others]:
+                    return tips + f"使用失败，对方未持有道具{inner_prop_key}"
+                session.data[props_others].remove(inner_prop_key)
+                session.data[props_self].append(inner_prop_key)
+                return use(session, inner_prop_key)
+            case "手机":
+                bullet = session.data["bullet"]
+                sum_bullet = len(bullet)
+                sum_real_bullet = sum(bullet)
+                sum_empty_bullet = sum_bullet - sum_real_bullet
+                random_index = random.randint(1, sum_bullet)
+                tips += f"\n弹仓内还有{sum_real_bullet}发实弹,{sum_empty_bullet}发空弹\n接下来第{random_index}发是：{'空弹' if bullet[random_index-1] == 0 else '实弹'}"
+            case "箱子":
+                prop1, prop2 = buckshot_roulette_random_props(2)
+                tips += f"\n你获得了{prop1}\n对方获得了{prop2}"
+                session.data[props_self].append(prop1)
+                session.data[props_self] = session.data[props_self][:8]
+                session.data[props_others].append(prop2)
+                session.data[props_others] = session.data[props_others][:8]
+            case _:
+                assert False, "玩家持有无法使用的道具"
+        return tips
+
+    return use(session, prop_key)
 
 
 from .horse_race import RaceWorld

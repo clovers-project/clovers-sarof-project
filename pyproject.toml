@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "clovers-leafgame"
-version = "0.1.1"
+version = "0.1.2"
 description = ""
 authors = ["KarisAya <1048827424@qq.com>"]
 readme = "README.md"
@@ -10,7 +10,7 @@ python = "^3.10"
 pydantic = "^2.7.0"
 mplfinance = "^0.12.10b0"
 clovers = {extras = ["linecard", "tools"], version = "^0.1.2"}
-clovers-apscheduler = "^0.1.2"
+clovers-apscheduler = "^0.1.3"
 
 
 [build-system]

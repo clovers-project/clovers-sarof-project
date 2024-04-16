@@ -32,7 +32,7 @@ class Manager:
         self.load()
 
     def save(self):
-        with open(self.DATA_PATH, "w") as f:
+        with open(self.DATA_PATH, "w", encoding="utf8") as f:
             f.write(self.data.model_dump_json(indent=4))
 
     def load(self):
