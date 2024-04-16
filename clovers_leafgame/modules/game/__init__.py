@@ -879,10 +879,11 @@ def buckshot_roulette_random_props(props_num: int):
 def buckshot_roulette_status(session: Session):
 
     result = []
-    result.append(f"玩家{session.p1_nickname}[nowrap]\n[pixel][340]玩家{session.p2_nickname}")
-    heart = lambda n: f"血量:[nowrap]\n[color][red]{n * '♥'}"
+    result.append(f"玩家 {session.p1_nickname}[nowrap]\n[pixel][340]玩家 {session.p2_nickname}")
+    heart = lambda n: f"血量 [nowrap]\n[color][red]{n * '♥'}"
     result.append(f"{heart(session.data['HP1'])}[nowrap]\n[pixel][340]{heart(session.data['HP2'])}")
-    result.append("道具：[nowrap]\n[pixel][340]道具：")
+    result.append("道具 [nowrap]\n[pixel][340]道具 ")
+    result.append("----")
     props1 = [f"{k} {v}" for k, v in Counter(session.data["props1"]).items()]
     props2 = [f"[pixel][340]{k} {v}" for k, v in Counter(session.data["props2"]).items()]
     props = [["", ""] for _ in range(max(len(props1), len(props2)))]

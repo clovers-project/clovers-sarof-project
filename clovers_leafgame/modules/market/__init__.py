@@ -1,4 +1,5 @@
 import time
+import heapq
 import math
 import random
 from io import BytesIO
@@ -6,9 +7,9 @@ from collections import Counter
 from clovers_apscheduler import scheduler
 from clovers.utils.tools import gini_coef, format_number
 from clovers_leafgame.core.clovers import Event, Check
-from clovers_leafgame.core.data import Group, Stock
+from clovers_leafgame.core.data import Account, Group, Stock
 from clovers_leafgame.main import plugin, manager
-from clovers_leafgame.item import GOLD, LICENSE, STD_GOLD, item_name_rule
+from clovers_leafgame.item import GOLD, LICENSE, STD_GOLD, REVOLUTION_MARKING, item_name_rule
 from clovers_leafgame.output import text_to_image, endline, invest_card, prop_card
 from clovers.core.config import config as clovers_config
 from .config import Config
@@ -20,8 +21,47 @@ clovers_config[config_key] = config_data.model_dump()
 
 revolt_gold = config_data.revolt_gold
 revolt_gini = config_data.revolt_gini
+gini_filter_gold = config_data.gini_filter_gold
 revolt_cd = config_data.revolt_cd
 company_public_gold = config_data.company_public_gold
+
+
+@plugin.handle("revolution", {"发起重置"}, {"group_id"})
+async def _(event: Event):
+    group_id = event.group_id
+    group = manager.data.group(group_id)
+    revolution_time = group.extra.get("revolution_time", 0)
+    if time.time() - revolution_time < revolt_cd:
+        return f"重置正在冷却中，结束时间：{time.strftime('%H:%M:%S', time.localtime(revolution_time + revolt_cd))}"
+    ranklist: list[tuple[Account, int]] = []
+    sum_wealths = 0
+    for account_id in group.accounts_map.values():
+        account = manager.data.account_dict[account_id]
+        n = account.bank[GOLD.id]
+        if account.bank[GOLD.id] >= gini_filter_gold:
+            ranklist.append(account, n)
+        sum_wealths += n
+    if sum_wealths < company_public_gold:
+        return f"本群金币（{sum_wealths}）小于{company_public_gold}，未满足重置条件。"
+    gini = gini_coef([x[1] for x in ranklist])
+    if gini < revolt_gini:
+        return f"当前基尼系数为{round(gini,3)}，未满足重置条件。"
+    ranklist = heapq.nlargest(10, ranklist, key=lambda x: x[1])
+    top = ranklist[0][0]
+    REVOLUTION_MARKING.locate_bank(*manager.locate_account(top.user_id, group_id))[REVOLUTION_MARKING.id] += 1
+    group.extra["revolution_time"] = time.time()
+    revolution_achieve: dict = group.extra.setdefault("revolution_achieve", {})
+    revolution_achieve[top.user_id] = revolution_achieve.get(top.user_id, 0) + 1
+    for i, (account, n) in enumerate(ranklist):
+        account.bank[GOLD.id] = int(n * i / 10)
+    for account_id in group.accounts_map.values():
+        manager.data.account_dict[account_id].extra["revolution"] = False
+    rate = group.level / group.level + 1
+    for k in group.bank:
+        if k[1] == "1":
+            group.bank[k] = int(group.bank[k] * rate)
+    group.level += 1
+    return f"当前系数为：{round(gini,3)}，重置成功！恭喜{top.name}进入挂件榜☆！重置签到已刷新。"
 
 
 @plugin.handle({"重置签到", "领取金币"}, {"user_id", "group_id", "nickname", "avatar"})
@@ -118,7 +158,7 @@ async def _(event: Event):
     stock_value = sum(wealths)
     if stock_value < company_public_gold:
         return f"本群金币（{stock_value}）小于{company_public_gold}，注册失败。"
-    gini = gini_coef(wealths[:-1])
+    gini = gini_coef([x for x in wealths[:-1] if x >= gini_filter_gold])
     if gini > revolt_gini:
         return f"本群基尼系数（{round(gini,3)}）过高，注册失败。"
     level = group.level = (sum(ra.values()) if (ra := group.extra.get("revolution_achieve")) else 0) + 1
@@ -363,9 +403,10 @@ async def _():
                 stock.exchange[user_id] = (0, 0)
             user.invest[stock.id] -= settle
             group.invest[stock.id] += settle
-            user.bank[STD_GOLD.id] += int(value)
+            int_value = int(value)
+            user.bank[STD_GOLD.id] += int_value
             user.message.append(
-                f"【交易市场 {clock}】收入{value}标准金币。\n{stock.name}已出售{settle}/{n}，报价{quote or format_number(value/settle)}。"
+                f"【交易市场 {clock}】收入{int_value}标准金币。\n{stock.name}已出售{settle}/{n}，报价{quote or format_number(value/settle)}。"
             )
             std_value += value
         group.bank[GOLD.id] -= int(std_value / level)
