@@ -875,7 +875,26 @@ def buckshot_roulette_random_props(props_num: int):
     prop_list = ["手铐", "短锯", "放大镜", "香烟", "啤酒", "逆转器", "过期药品", "箱子"]
     return random.choices(prop_list, k=props_num)
 
-def buckshot_roulette_
+
+def buckshot_roulette_status(session: Session):
+
+    result = []
+    result.append(f"玩家{session.p1_nickname}[nowrap]\n[pixel][340]玩家{session.p2_nickname}")
+    heart = lambda n: f"血量:[nowrap]\n[color][red]{n * '♥'}"
+    result.append(f"{heart(session.data['HP1'])}[nowrap]\n[pixel][340]{heart(session.data['HP2'])}")
+    result.append("道具：[nowrap]\n[pixel][340]道具：")
+    props1 = [f"{k} {v}" for k, v in Counter(session.data["props1"]).items()]
+    props2 = [f"[pixel][340]{k} {v}" for k, v in Counter(session.data["props2"]).items()]
+    props = [["", ""] for _ in range(max(len(props1), len(props2)))]
+    for i, x in enumerate(props1):
+        props[i][0] = x
+    for i, x in enumerate(props2):
+        props[i][1] = x
+    result.append("\n".join(f"{x}[nowrap]\n{y}" for x, y in props))
+    output = BytesIO()
+    text_to_image("\n".join(result), bg_color="white", width=660).save(output, format="png")
+    return output
+
 
 def buckshot_roulette_loading(session: Session):
     props_num = random.randint(1, 4)
@@ -887,14 +906,7 @@ def buckshot_roulette_loading(session: Session):
     session.data["buff2"].clear()
     bullet, real_bullet_num, empty_bullet_num = buckshot_roulette_random_bullet(random.randint(2, 8))
     session.data["bullet"] = bullet
-    result = [f"本轮装弹：\n实弹:{real_bullet_num} 空弹:{empty_bullet_num}"]
-    result.append(f"玩家{session.p1_nickname}血量:{session.data['HP1']}")
-    result.append("道具：")
-    result.append(" ".join(f"{k} {v}" for k, v in Counter(session.data["props1"]).items()))
-    result.append(f"玩家{session.p2_nickname}血量:{session.data['HP2']}")
-    result.append("道具：")
-    result.append(" ".join(f"{k} {v}" for k, v in Counter(session.data["props2"]).items()))
-    return result
+    return f"本轮装弹：\n实弹:{real_bullet_num} 空弹:{empty_bullet_num}"
 
 
 @plugin.handle({"恶魔轮盘"}, {"user_id", "group_id", "at"})
@@ -906,12 +918,14 @@ async def _(session: Session, arg: str):
     session.data["HP2"] = hp
     session.data["buff1"] = set()
     session.data["buff2"] = set()
+    session.data["props1"] = []
+    session.data["props2"] = []
     if session.bet:
         prop, n = session.bet
         tip = f"\n本场下注：{n}{prop.name}/轮"
     else:
         tip = ""
-    session.start_tips = "\n".join(buckshot_roulette_loading(session))
+    session.start_tips = [buckshot_roulette_loading(session), buckshot_roulette_status(session)]
     return f"恶魔轮盘场地已创建。{tip}\n{session.create_info()}"
 
 
@@ -955,10 +969,9 @@ async def _(event: Event, session: Session):
 
     if not bullet:
         result.append("最后一发子弹已打出。")
-        result.extend(buckshot_roulette_loading(session))
+        result.append(buckshot_roulette_loading(session))
     else:
         session.data["bullet"] = bullet
-
 
     if (target == "自己" and current_bullet == 0) or remove_tag(session.data[buff], "手铐"):
         session.delay()
@@ -966,7 +979,7 @@ async def _(event: Event, session: Session):
         session.nextround()
     next_name = session.p1_nickname if session.next == session.p1_uid else session.p2_nickname
     result.append(f"请下一位玩家：{next_name}\n{buckshot_roulette.action_tip}")
-    return "\n".join(result)
+    return ["\n".join(result), buckshot_roulette_status(session)]
 
 
 @plugin.handle({"使用道具"}, {"user_id", "group_id"})
@@ -1036,9 +1049,7 @@ async def _(event: Event, session: Session):
             tips += f"\n你退掉了一发{bullet_name}"
             session.data["bullet"] = bullet[1:]
         case "逆转器":
-            bullet = session.data["bullet"]
-            bullet[0] == 1 if bullet[0] == 0 else 0
-            session.data["bullet"] = bullet
+            session.data["bullet"][0] = abs(session.data["bullet"][0] - 1)
         case "过期药品":
             if random.randint(0, 1) == 1:
                 tips += "\n你增加了2滴血"

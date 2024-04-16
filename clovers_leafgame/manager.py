@@ -33,7 +33,7 @@ class Manager:
 
     def save(self):
         with open(self.DATA_PATH, "w") as f:
-            f.write(self.data.json(indent=4))
+            f.write(self.data.model_dump_json(indent=4))
 
     def load(self):
         self.data = DataBase.load(self.DATA_PATH)
