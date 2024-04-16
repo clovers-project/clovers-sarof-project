@@ -864,8 +864,8 @@ buckshot_roulette = Game("恶魔轮盘", "向自己开枪|向对方开枪|使用
 
 
 def buckshot_roulette_random_bullet(bullet_num: int):
-    real_bullet_num = random.randint(1, bullet_num // 2 + 1)
-    empty_bullet_num = bullet_num - real_bullet_num
+    empty_bullet_num = random.randint(1, bullet_num // 2)
+    real_bullet_num = bullet_num - empty_bullet_num
     bullet = [1] * real_bullet_num + [0] * empty_bullet_num
     random.shuffle(bullet)
     return bullet, real_bullet_num, empty_bullet_num
@@ -875,33 +875,43 @@ def buckshot_roulette_random_props(props_num: int):
     prop_list = ["手铐", "短锯", "放大镜", "香烟", "啤酒", "逆转器", "过期药品", "箱子"]
     return random.choices(prop_list, k=props_num)
 
+def buckshot_roulette_
+
+def buckshot_roulette_loading(session: Session):
+    props_num = random.randint(1, 4)
+    session.data["props1"] += buckshot_roulette_random_props(props_num)
+    session.data["props1"] = session.data["props1"][:8]
+    session.data["buff1"].clear()
+    session.data["props2"] += buckshot_roulette_random_props(props_num)
+    session.data["props2"] = session.data["props2"][:8]
+    session.data["buff2"].clear()
+    bullet, real_bullet_num, empty_bullet_num = buckshot_roulette_random_bullet(random.randint(2, 8))
+    session.data["bullet"] = bullet
+    result = [f"本轮装弹：\n实弹:{real_bullet_num} 空弹:{empty_bullet_num}"]
+    result.append(f"玩家{session.p1_nickname}血量:{session.data['HP1']}")
+    result.append("道具：")
+    result.append(" ".join(f"{k} {v}" for k, v in Counter(session.data["props1"]).items()))
+    result.append(f"玩家{session.p2_nickname}血量:{session.data['HP2']}")
+    result.append("道具：")
+    result.append(" ".join(f"{k} {v}" for k, v in Counter(session.data["props2"]).items()))
+    return result
+
 
 @plugin.handle({"恶魔轮盘"}, {"user_id", "group_id", "at"})
 @buckshot_roulette.create(place)
 async def _(session: Session, arg: str):
-    bullet, real_bullet_num, empty_bullet_num = buckshot_roulette_random_bullet(random.randint(3, 8))
-    session.data["bullet"] = bullet
     hp = random.randint(3, 6)
     session.data["HP_MAX"] = hp
     session.data["HP1"] = hp
     session.data["HP2"] = hp
-    props_num = random.randint(1, 4)
-    props1 = buckshot_roulette_random_props(props_num)
-    session.data["props1"] = props1
-    session.data["buff1"] = []
-    session.data["props2"] = buckshot_roulette_random_props(props_num)
-    session.data["buff2"] = []
+    session.data["buff1"] = set()
+    session.data["buff2"] = set()
     if session.bet:
         prop, n = session.bet
         tip = f"\n本场下注：{n}{prop.name}/轮"
     else:
         tip = ""
-    start_tips = []
-    start_tips.append(f"双方血量：{hp}")
-    start_tips.append(f"本轮装弹：\n实弹:{real_bullet_num} 空弹:{empty_bullet_num}")
-    start_tips.append("你的道具：")
-    start_tips.append(" ".join(props1))
-    session.start_tips = "\n".join(start_tips)
+    session.start_tips = "\n".join(buckshot_roulette_loading(session))
     return f"恶魔轮盘场地已创建。{tip}\n{session.create_info()}"
 
 
@@ -922,6 +932,16 @@ async def _(event: Event, session: Session):
         buff = "buff2"
     target = event.single_arg()
     hp = hp_self if target == "自己" else hp_others
+
+    def remove_tag(buffs: set[str], tag: str):
+        if tag in buffs:
+            buffs.remove(tag)
+            return True
+        else:
+            return False
+
+    if remove_tag(session.data[buff], "短锯"):
+        current_bullet *= 2
     session.data[hp] -= current_bullet
     result = []
     if current_bullet:
@@ -935,29 +955,15 @@ async def _(event: Event, session: Session):
 
     if not bullet:
         result.append("最后一发子弹已打出。")
-        props_num = random.randint(1, 4)
-        session.data["props1"] += buckshot_roulette_random_props(props_num)
-        session.data["props1"] = session.data["props1"][:8]
-        session.data["buff1"] = []
-        session.data["props2"] += buckshot_roulette_random_props(props_num)
-        session.data["props2"] = session.data["props2"][:8]
-        session.data["buff2"] = []
-        bullet, real_bullet_num, empty_bullet_num = buckshot_roulette_random_bullet(random.randint(2, 8))
-        result.append(f"本轮装弹：\n实弹:{real_bullet_num} 空弹:{empty_bullet_num}")
-    if target == "自己" and current_bullet == 0:
-        session.delay()
-    elif "手铐" in session.data[buff]:
-        session.data[buff].remove("手铐")
+        result.extend(buckshot_roulette_loading(session))
+    else:
+        session.data["bullet"] = bullet
+
+
+    if (target == "自己" and current_bullet == 0) or remove_tag(session.data[buff], "手铐"):
         session.delay()
     else:
         session.nextround()
-    session.data["bullet"] = bullet
-    result.append(f"玩家{session.p1_nickname}血量:{session.data['HP1']}")
-    result.append("道具：")
-    result.append(" ".join(f"{k} {v}" for k, v in Counter(session.data["props1"]).items()))
-    result.append(f"玩家{session.p2_nickname}血量:{session.data['HP2']}")
-    result.append("道具：")
-    result.append(" ".join(f"{k} {v}" for k, v in Counter(session.data["props2"]).items()))
     next_name = session.p1_nickname if session.next == session.p1_uid else session.p2_nickname
     result.append(f"请下一位玩家：{next_name}\n{buckshot_roulette.action_tip}")
     return "\n".join(result)
@@ -989,7 +995,7 @@ async def _(event: Event, session: Session):
         "香烟": "增加1点血量",
         "啤酒": "退一发子弹",
         "逆转器": "转换当前枪膛里面的子弹真假",
-        "过期药品": "40%的概率回两滴血，剩下的概率扣一滴血",
+        "过期药品": "50%的概率回两滴血，剩下的概率扣一滴血",
         "箱子": "每人抽取一件道具",
     }
     if event.user_id == session.p1_uid:
@@ -1013,10 +1019,9 @@ async def _(event: Event, session: Session):
     tips = prop_tips.get(prop_key, "")
     match event.single_arg():
         case "手铐":
-            session.data[buff].append("手铐")
+            session.data[buff].add("手铐")
         case "短锯":
-            if session.data["bullet"][0] != 0:
-                session.data["bullet"][0] = 2
+            session.data[buff].add("短锯")
         case "放大镜":
             tips += f"\n本发是{'空弹' if session.data['bullet'][0] == 0 else '实弹'}"
         case "香烟":
@@ -1035,7 +1040,7 @@ async def _(event: Event, session: Session):
             bullet[0] == 1 if bullet[0] == 0 else 0
             session.data["bullet"] = bullet
         case "过期药品":
-            if random.randint(1, 10) <= 4:
+            if random.randint(0, 1) == 1:
                 tips += "\n你增加了2滴血"
                 session.data[hp_self] += 2
                 session.data[hp_self] = min(session.data[hp_self], session.data["HP_MAX"])
