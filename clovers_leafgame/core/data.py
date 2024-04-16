@@ -127,7 +127,7 @@ class DataBase(BaseModel):
     def load(cls, file: Path) -> "DataBase":
         if file.exists():
             with open(file, "r", encoding="utf8") as f:
-                data = cls.parse_obj(json.load(f))
+                data = cls.model_validate(json.load(f))
         else:
             data = cls()
         return data

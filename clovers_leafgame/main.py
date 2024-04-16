@@ -7,9 +7,9 @@ from .manager import Manager
 from .config import Config
 
 config_key = __package__
-config_data = Config.parse_obj(clovers_config.get(config_key, {}))
+config_data = Config.model_validate(clovers_config.get(config_key, {}))
 """主配置类"""
-clovers_config[config_key] = config_data.dict()
+clovers_config[config_key] = config_data.model_dump()
 
 
 def build_result(result):

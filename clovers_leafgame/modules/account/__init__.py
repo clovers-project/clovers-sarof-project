@@ -29,8 +29,8 @@ from .config import Config
 
 
 config_key = __package__
-config_data = Config.parse_obj(clovers_config.get(config_key, {}))
-clovers_config[config_key] = config_data.dict()
+config_data = Config.model_validate(clovers_config.get(config_key, {}))
+clovers_config[config_key] = config_data.model_dump()
 
 sign_gold = config_data.sign_gold
 clovers_marking = config_data.clovers_marking

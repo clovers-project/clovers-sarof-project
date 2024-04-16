@@ -25,7 +25,7 @@ def deal(raw_event: dict):
     for buff_tag in raw_event.get("other_buff", []):
         buffs.add(buff_tag)
     raw_event["buffs"] = buffs
-    return Event.parse_obj(raw_event)
+    return Event.model_validate(raw_event)
 
 
 def _deal(event: dict):
@@ -223,4 +223,4 @@ def _deal(event: dict):
         event_out["replace_horse"] = {}
 
     # 上方危险勿动
-    return Event.parse_obj(event_out)
+    return Event.model_validate(event_out)

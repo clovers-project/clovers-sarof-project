@@ -11,8 +11,8 @@ from clovers.core.config import config as clovers_config
 from .config import Config
 
 config_key = __package__
-config_data = Config.parse_obj(clovers_config.get(config_key, {}))
-clovers_config[config_key] = config_data.dict()
+config_data = Config.model_validate(clovers_config.get(config_key, {}))
+clovers_config[config_key] = config_data.model_dump()
 
 default_bet = config_data.default_bet
 timeout = config_data.timeout
