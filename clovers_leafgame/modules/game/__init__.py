@@ -1005,23 +1005,27 @@ async def _(event: Event, session: Session):
             "箱子": "每人抽取一件道具",
         }
         if session.next == session.p1_uid:
-            hp_self, hp_others, buff, props_self, props_others = "HP1", "HP2", "buff1", "props1", "props2"
+            self_key = "1"
+            others_key = "2"
         else:
-            hp_self, hp_others, buff, props_self, props_others = "HP2", "HP1", "buff2", "props2", "props1"
-        if prop_key not in session.data[props_self]:
+            self_key = "2"
+            others_key = "1"
+        props = f"props{self_key}"
+        if prop_key not in session.data[props]:
             return f"你未持有道具【{prop_key}】"
-        session.data[props_self].remove(prop_key)
+        session.data[props].remove(prop_key)
         tips = "效果：" + prop_tips[prop_key]
 
         match prop_key:
             case "手铐" | "短锯":
-                session.data[buff].add(prop_key)
+                session.data[f"buff{self_key}"].add(prop_key)
             case "放大镜":
                 tips += f"\n本发是：{'空弹' if session.data['bullet'][0] == 0 else '实弹'}"
             case "香烟":
-                session.data[hp_self] += 1
-                session.data[hp_self] = min(session.data[hp_self], session.data["HP_MAX"])
-                tips += f"\n你的血量：{session.data[hp_self]}"
+                hp = f"HP{self_key}"
+                session.data[hp] += 1
+                session.data[hp] = min(session.data[hp], session.data["HP_MAX"])
+                tips += f"\n你的血量：{session.data[hp]}"
             case "啤酒":
                 tips += f"\n你退掉了一发：{'空弹' if session.data['bullet'][0] == 0 else '实弹'}"
                 session.data["bullet"] = session.data["bullet"][1:]
@@ -1030,26 +1034,28 @@ async def _(event: Event, session: Session):
             case "逆转器":
                 session.data["bullet"][0] = 1 - session.data["bullet"][0]
             case "过期药品":
+                hp = f"HP{self_key}"
                 if random.randint(0, 1) == 0:
                     tips += "\n你减少了1滴血"
-                    session.data[hp_self] -= 1
-                    if session.data[hp_self] <= 0:
-                        session.win = session.p1_uid if hp_self == "HP2" else session.p2_uid
+                    session.data[hp] -= 1
+                    if session.data[hp] <= 0:
+                        session.win = getattr(session, f"p{others_key}_uid")
                         return session.end(tips)
                 else:
                     tips += "\n你增加了2滴血"
-                    session.data[hp_self] += 2
-                    session.data[hp_self] = min(session.data[hp_self], session.data["HP_MAX"])
+                    session.data[hp] += 2
+                    session.data[hp] = min(session.data[hp], session.data["HP_MAX"])
             case "肾上腺素":
                 if len(event.args) < 2:
                     return tips + "使用失败，你未指定对方的道具"
                 inner_prop_key = event.args[1]
                 if inner_prop_key == prop_key:
                     return tips + "使用失败，目标不能是肾上腺素"
-                if inner_prop_key not in session.data[props_others]:
+                others_props = f"props{others_key}"
+                if inner_prop_key not in session.data[others_props]:
                     return tips + f"使用失败，对方未持有道具{inner_prop_key}"
-                session.data[props_others].remove(inner_prop_key)
-                session.data[props_self].append(inner_prop_key)
+                session.data[others_props].remove(inner_prop_key)
+                session.data[props].append(inner_prop_key)
                 return use(session, inner_prop_key)
             case "手机":
                 bullet = session.data["bullet"]
@@ -1060,11 +1066,12 @@ async def _(event: Event, session: Session):
                 tips += f"\n弹仓内还有{sum_real_bullet}发实弹,{sum_empty_bullet}发空弹\n接下来第{random_index}发是：{'空弹' if bullet[random_index-1] == 0 else '实弹'}"
             case "箱子":
                 prop1, prop2 = buckshot_roulette_random_props(2)
+                session.data[props].append(prop1)
+                session.data[props] = session.data[props][:8]
+                others_props = f"props{others_key}"
+                session.data[others_props].append(prop2)
+                session.data[others_props] = session.data[others_props][:8]
                 tips += f"\n你获得了{prop1}\n对方获得了{prop2}"
-                session.data[props_self].append(prop1)
-                session.data[props_self] = session.data[props_self][:8]
-                session.data[props_others].append(prop2)
-                session.data[props_others] = session.data[props_others][:8]
             case _:
                 assert False, "玩家持有无法使用的道具"
         return tips
