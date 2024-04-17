@@ -864,7 +864,8 @@ buckshot_roulette = Game("恶魔轮盘", "向自己开枪|向对方开枪|使用
 
 
 def buckshot_roulette_random_bullet(bullet_num: int):
-    empty_bullet_num = random.randint(1, bullet_num // 2)
+    """填装一半的子弹"""
+    empty_bullet_num = bullet_num // 2
     real_bullet_num = bullet_num - empty_bullet_num
     bullet = [1] * real_bullet_num + [0] * empty_bullet_num
     random.shuffle(bullet)

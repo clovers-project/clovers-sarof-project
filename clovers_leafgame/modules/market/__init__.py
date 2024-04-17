@@ -57,9 +57,10 @@ async def _(event: Event):
     for account_id in group.accounts_map.values():
         manager.data.account_dict[account_id].extra["revolution"] = False
     rate = group.level / group.level + 1
-    for k in group.bank:
-        if k[1] == "1":
-            group.bank[k] = int(group.bank[k] * rate)
+    for prop_id, n in group.bank.items():
+        prop = manager.props_library[prop_id]
+        if prop.domain == 1:
+            group.bank[prop_id] = int(n * rate)
     group.level += 1
     return f"当前系数为：{round(gini,3)}，重置成功！恭喜{top.name}进入挂件榜☆！重置签到已刷新。"
 

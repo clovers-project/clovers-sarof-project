@@ -27,11 +27,10 @@ def all_ranklist(title: str):
         return
     ranklist = []
     if prop.domain == 1:
-
-        def std_value(prop_id: str, group_id: str, account_id: str):
-            return manager.data.account_dict[account_id].bank[prop_id] * manager.data.group(group_id).level
-
-        value = lambda prop_id: sum(std_value(prop_id, group_id, account_id) for group_id, account_id in user.accounts_map.items())
+        prop_num = lambda account_id, prop_id: manager.data.account_dict[account_id].bank[prop_id]
+        group_level = lambda group_id: manager.data.group(group_id).level
+        std_value = lambda prop_id, group_id, account_id: prop_num(account_id, prop_id) * group_level(group_id)
+        value = lambda prop_id: sum(std_value(prop_id, *args) for args in user.accounts_map.items())
     else:
         value = lambda prop_id: user.bank[prop_id]
     for user_id in manager.data.user_dict.keys():
@@ -53,7 +52,7 @@ def group_ranklist(title: str, group_id: str):
     return ranklist
 
 
-@plugin.handle(r"^(.+)排行(.*)", {"user_id", "group_id"})
+@plugin.handle(r"^(.+)排行(.*)", {"user_id", "group_id", "to_me"})
 async def _(event: Event):
     title = event.args[0]
     if title.startswith("路灯挂件"):
@@ -81,7 +80,7 @@ async def _(event: Event):
             return
         ranklist = group_ranklist(title, group_id)
     if not ranklist:
-        return f"无数据，无法进行{title}排行"
+        return f"无数据，无法进行{title}排行" if event.to_me else None
     ranklist = heapq.nlargest(20, ranklist, key=lambda x: x[1])
     nickname_data = []
     rank_data = []
