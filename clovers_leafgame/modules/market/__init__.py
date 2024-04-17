@@ -26,7 +26,7 @@ revolt_cd = config_data.revolt_cd
 company_public_gold = config_data.company_public_gold
 
 
-@plugin.handle("revolution", {"发起重置"}, {"group_id"})
+@plugin.handle({"发起重置"}, {"group_id"})
 async def _(event: Event):
     group_id = event.group_id
     group = manager.data.group(group_id)
