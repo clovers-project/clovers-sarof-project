@@ -1,4 +1,3 @@
-import json
 from datetime import datetime
 from pathlib import Path
 from pydantic import BaseModel
@@ -124,10 +123,10 @@ class DataBase(BaseModel):
     extra: dict = {}
 
     @classmethod
-    def load(cls, file: Path) -> "DataBase":
+    def load(cls, file: Path):
         if file.exists():
             with open(file, "r", encoding="utf8") as f:
-                data = cls.model_validate(json.load(f))
+                data = cls.model_validate_json(f.read())
         else:
             data = cls()
         return data

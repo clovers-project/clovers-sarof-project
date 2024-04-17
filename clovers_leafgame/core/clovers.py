@@ -54,10 +54,6 @@ class Event:
     def group_avatar(self) -> str:
         return self.event.kwargs["group_avatar"]
 
-    @property
-    def group_info(self) -> list:
-        return self.event.kwargs["group_info"]
-
     def args_to_int(self):
         if args := self.args:
             n = to_int(args[0]) or 0
