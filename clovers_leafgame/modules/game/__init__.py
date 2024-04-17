@@ -1047,13 +1047,13 @@ async def _(event: Event, session: Session):
                     session.data[hp] = min(session.data[hp], session.data["HP_MAX"])
             case "肾上腺素":
                 if len(event.args) < 2:
-                    return tips + "使用失败，你未指定对方的道具"
+                    return tips + "\n使用失败，你未指定对方的道具"
                 inner_prop_key = event.args[1]
                 if inner_prop_key == prop_key:
-                    return tips + "使用失败，目标不能是肾上腺素"
+                    return tips + "\n使用失败，目标不能是肾上腺素"
                 others_props = f"props{others_key}"
                 if inner_prop_key not in session.data[others_props]:
-                    return tips + f"使用失败，对方未持有道具{inner_prop_key}"
+                    return tips + f"\n使用失败，对方未持有道具{inner_prop_key}"
                 session.data[others_props].remove(inner_prop_key)
                 session.data[props].append(inner_prop_key)
                 return use(session, inner_prop_key)
