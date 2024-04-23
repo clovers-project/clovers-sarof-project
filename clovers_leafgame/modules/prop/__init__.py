@@ -207,7 +207,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     tip = "请输入你要回档的日期:\n" + "\n".join(folders.keys())
     key = f"{user_id} {group_id}"
 
-    @plugin.temp_handle(key, {"user_id", "group_id"}, 30)
+    @plugin.temp_handle(key, extra_args={"user_id", "group_id"})
     @Check().locate(user_id, group_id).check
     async def _(event: Event, finish):
         date = event.raw_command
@@ -218,7 +218,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         tip2 = "请输入你要回档的时间:\n" + "\n".join(files.keys())
         finish()
 
-        @plugin.temp_handle(key, {"user_id", "group_id"}, 30)
+        @plugin.temp_handle(key, extra_args={"user_id", "group_id"})
         @Check().locate(user_id, group_id).check
         async def _(event: Event, finish):
             clock = event.raw_command
@@ -251,7 +251,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         for k in bank.keys():
             bank[k] *= 10
 
-    @plugin.temp_handle(f"{user_id} {group_id}", {"user_id", "group_id"}, 30)
+    @plugin.temp_handle(f"{user_id} {group_id}", extra_args={"user_id", "group_id"})
     async def _(event_1: Event, finish):
         if event_1.user_id != user_id or event_1.group_id != group_id:
             return

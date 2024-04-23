@@ -74,13 +74,13 @@ files = [
 
 [[package]]
 name = "clovers"
-version = "0.1.2"
+version = "0.1.3"
 description = ""
 optional = false
 python-versions = "<4.0,>=3.10"
 files = [
-    {file = "clovers-0.1.2-py3-none-any.whl", hash = "sha256:87ee3371e8656a3c7bc87b75ef0100c53f48348582cd9a93e3b20de2a0d7fe06"},
-    {file = "clovers-0.1.2.tar.gz", hash = "sha256:29311cbb16a529e8b40ed52b3119b82f5be1c2e72b27bb373cdbf6a319031e2c"},
+    {file = "clovers-0.1.3-py3-none-any.whl", hash = "sha256:a18b8b18e4d9097b8ffe615e484911b72141937e959822181bea154a63471b09"},
+    {file = "clovers-0.1.3.tar.gz", hash = "sha256:a5a22847f8b541d49ae55e2e419959a20a73fe1939ccedf0b17c39b863cb0a9c"},
 ]
 
 [package.dependencies]
@@ -97,13 +97,13 @@ tools = ["httpx (>=0.27.0,<0.28.0)", "numpy (>=1.26.4,<2.0.0)"]
 
 [[package]]
 name = "clovers-apscheduler"
-version = "0.1.2"
+version = "0.1.3"
 description = ""
 optional = false
 python-versions = "<4.0,>=3.10"
 files = [
-    {file = "clovers_apscheduler-0.1.2-py3-none-any.whl", hash = "sha256:599d470bc240b97825cd5b578256f5880dff41e53eaaa1526b3e5f31ae2e52d9"},
-    {file = "clovers_apscheduler-0.1.2.tar.gz", hash = "sha256:c8df1edaa6c5819a2445fffcd6ffd0283a84d79f99659420fa0d249491ed29e4"},
+    {file = "clovers_apscheduler-0.1.3-py3-none-any.whl", hash = "sha256:0379cb154c444d5b880ce122d8ed6bc988f54227bf2fd1838edc06747dea8e71"},
+    {file = "clovers_apscheduler-0.1.3.tar.gz", hash = "sha256:32aacd928d1870d4aa881a14e96eed73169c59a256fffcdbc223127ab53bd7af"},
 ]
 
 [package.dependencies]
@@ -191,13 +191,13 @@ tests = ["pytest", "pytest-cov", "pytest-xdist"]
 
 [[package]]
 name = "exceptiongroup"
-version = "1.2.0"
+version = "1.2.1"
 description = "Backport of PEP 654 (exception groups)"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "exceptiongroup-1.2.0-py3-none-any.whl", hash = "sha256:4bfd3996ac73b41e9b9628b04e079f193850720ea5945fc96a08633c66912f14"},
-    {file = "exceptiongroup-1.2.0.tar.gz", hash = "sha256:91f5c769735f051a4290d52edd0858999b57e5876e9f85937691bd4c9fa3ed68"},
+    {file = "exceptiongroup-1.2.1-py3-none-any.whl", hash = "sha256:5258b9ed329c5bbdd31a309f53cbfb0b155341807f6ff7606a1e801a891b29ad"},
+    {file = "exceptiongroup-1.2.1.tar.gz", hash = "sha256:a4785e48b045528f5bfe627b6ad554ff32def154f42372786903b7abcfe1aa16"},
 ]
 
 [package.extras]
@@ -948,4 +948,4 @@ devenv = ["check-manifest", "pytest (>=4.3)", "pytest-cov", "pytest-mock (>=3.3)
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "cbf486881db923be84c07c4dafc21c9b5dba0a8fa2f0e5dae74766e3a76cb26d"
+content-hash = "a0c90cdb50a5f046fd11ad384c0bbdb622ee0c830cfd8b12159d7ee7a24c549d"

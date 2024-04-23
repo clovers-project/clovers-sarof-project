@@ -39,7 +39,7 @@ async def _(event: Event):
         account = manager.data.account_dict[account_id]
         n = account.bank[GOLD.id]
         if account.bank[GOLD.id] >= gini_filter_gold:
-            ranklist.append(account, n)
+            ranklist.append((account, n))
         sum_wealths += n
     if sum_wealths < company_public_gold:
         return f"本群金币（{sum_wealths}）小于{company_public_gold}，未满足重置条件。"
