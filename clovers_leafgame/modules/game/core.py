@@ -198,7 +198,7 @@ class Game:
             async def wrapper(event: Event):
                 user_id = event.user_id
                 group_id = event.group_id
-                if (session := self.session_check(place, user_id)) and (tip := session.create_check(user_id)):
+                if (session := self.session_check(place, group_id)) and (tip := session.create_check(user_id)):
                     return tip
                 prop_name, n, arg = self.args_parse(event.args)
                 prop = manager.props_library.get(prop_name, GOLD)
@@ -225,9 +225,8 @@ class Game:
         def decorator(func: Callable[[Event, Session], Coroutine]):
             async def wrapper(event: Event):
                 group_id = event.group_id or manager.data.user(event.user_id).connect
-                if not (session := self.session_check(place, group_id)):
-                    return
-                if session.game.name != self.name:
+                session = place.get(group_id)
+                if not session or session.game.name != self.name:
                     return
                 user_id = event.user_id
                 if tip := session.action_check(user_id):
