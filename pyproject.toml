@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "clovers-leafgame"
-version = "0.1.5"
+version = "0.1.5r1"
 description = ""
 authors = ["KarisAya <1048827424@qq.com>"]
 readme = "README.md"

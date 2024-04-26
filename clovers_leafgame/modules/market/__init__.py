@@ -96,12 +96,12 @@ async def _(event: Event):
         account.bank[GOLD.id] += n_in
         return f"你成功将{n_out}枚标准金币兑换为{n_in}枚金币"
     else:
-        n_out = n
+        n_out = -n
         if n_out > account.bank[GOLD.id]:
             n_out = account.bank[GOLD.id]
             n_in = account.bank[GOLD.id] * level
         else:
-            n_in = n * level
+            n_in = n_out * level
         user.bank[STD_GOLD.id] += n_in
         account.bank[GOLD.id] -= n_out
         return f"你成功将{n_out}枚金币兑换为{n_in}枚标准金币"
