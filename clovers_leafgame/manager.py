@@ -51,7 +51,7 @@ class Manager:
             backup_today.mkdir()
         self.save()
         file = backup_today / f"russian_data {now_time}.json"
-        file.write_text(self.data.json(indent=4))
+        file.write_text(self.data.model_dump_json(indent=4))
 
     def clean_backup(self, delta: int | float):
         folders = [f for f in self.backup_path.iterdir() if f.is_dir()]
