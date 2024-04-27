@@ -4,6 +4,7 @@
 # clovers-leafgame
 
 _✨ 改自 [nonebot_plugin_russian](https://github.com/HibiKier/nonebot_plugin_russian) 和 [nonebot_plugin_horserace](https://github.com/shinianj/nonebot_plugin_horserace) 的小游戏合集 ✨_
+
 <img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="python">
 <a href="./LICENSE">
 <img src="https://img.shields.io/github/license/KarisAya/clovers_leafgame.svg" alt="license">
