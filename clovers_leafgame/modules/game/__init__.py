@@ -1030,7 +1030,7 @@ async def _(event: Event, session: Session):
                 tips += f"\n你退掉了一发：{'空弹' if session.data['bullet'][0] == 0 else '实弹'}"
                 session.data["bullet"] = session.data["bullet"][1:]
                 if not session.data["bullet"]:
-                    return [f"最后一发子弹已被退出{tips}", buckshot_roulette_loading(session)]
+                    return [f"最后一发子弹已被退出。\n{tips}\n{buckshot_roulette_loading(session)}", buckshot_roulette_status(session)]
             case "逆转器":
                 session.data["bullet"][0] = 1 - session.data["bullet"][0]
             case "过期药品":
