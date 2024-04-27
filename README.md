@@ -1,44 +1,27 @@
 <!-- markdownlint-disable MD031 MD033 MD036 MD041 -->
+<div align="center">
 
-# clovers_leafgame
+# clovers-leafgame
 
 _✨ 改自 [nonebot_plugin_russian](https://github.com/HibiKier/nonebot_plugin_russian) 和 [nonebot_plugin_horserace](https://github.com/shinianj/nonebot_plugin_horserace) 的小游戏合集 ✨_
-
-<div align="center">
 <img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="python">
 <a href="./LICENSE">
-  <img src="https://img.shields.io/github/license/KarisAya/clovers_leafgame.svg" alt="license">
+<img src="https://img.shields.io/github/license/KarisAya/clovers_leafgame.svg" alt="license">
 </a>
 <a href="https://pypi.python.org/pypi/clovers_leafgame">
-  <img src="https://img.shields.io/pypi/v/clovers_leafgame.svg" alt="pypi">
+<img src="https://img.shields.io/pypi/v/clovers_leafgame.svg" alt="pypi">
 </a>
 <a href="https://pypi.python.org/pypi/clovers_leafgame">
-  <img src="https://img.shields.io/pypi/dm/clovers_leafgame" alt="pypi download">
+<img src="https://img.shields.io/pypi/dm/clovers_leafgame" alt="pypi download">
 </a>
 
 </div>
 
 ## 💿 安装
 
-<details open>
-
-<summary>pip</summary>
-
 ```bash
 pip install clovers_leafgame
 ```
-
-</details>
-
-<details>
-
-<summary>poetry</summary>
-
-```bash
-poetry add clovers_leafgame
-```
-
-</details>
 
 ## ⚙️ 配置
 
@@ -108,14 +91,11 @@ luckey_coin = [ 2000, 100000,]
 
 你需要往这个文件夹下添加一个 `default.png` 的图片，所有人的默认资料卡背景图片就是这张图了。
 
-如果不配置的话，就是纯色（~~高性能模式~~）。
+如果不配置的话，就是纯色 ~~高性能模式~~
 
 改图片的时候不用关 bot 也会生效
 
 ## 🎉 使用
-
-游戏可以使用道具作为赌注！
-注：同一时间群内只能有一场对决
 
 <details>
   
@@ -411,6 +391,10 @@ _名下所有账户的金币与股票净值翻 10 倍，或清空。_
 
 <summary>开始游戏</summary>
 
+游戏可以使用道具作为赌注！
+
+注：同一时间群内只能有一场对决
+
 所有游戏都可以通过下方的指令发起
 
 `发起游戏指令 【下注道具】 【下注数量】 【其它参数】@someone`
@@ -576,8 +560,6 @@ ACE 技能：摇一个 6 面骰子，把打出的 ACE 牌点替换成摇出的�
 
 **规则**
 
-赌注上限为单次 5 倍赌注上限
-
 通过 21 点 来对其他人对战，手牌点数大的获胜。
 
 游戏中点数超过 21 会直接失败。
@@ -600,8 +582,6 @@ ACE 技能：摇一个 6 面骰子，把打出的 ACE 牌点替换成摇出的�
 
 **规则**
 
-赌注上限为 5 倍赌注上限
-
 双方私聊 bot 本轮的行动
 
 双方初始 1 发子弹，装弹上限为 6 发子弹（6 发可以继续装弹，但是子弹数不会再增加了）。
@@ -619,6 +599,44 @@ ACE 技能：摇一个 6 面骰子，把打出的 ACE 牌点替换成摇出的�
 `预判开枪` 在 **初始位置** 行动，打对方 **闪避位置** ，剩余子弹数-1 击杀 `闪避` `闪枪`
 
 注：预判开枪不会与闪枪发生子弹碰撞，因为预判开枪速度比闪避开枪速度快。
+
+</details>
+
+<details>
+
+<summary>恶魔轮盘</summary>
+
+**发起**
+
+`恶魔轮盘`
+
+**进行**
+
+`向对方开枪`,`向自己开枪`
+
+如果向自己开枪是空弹，那么下一回合仍是自己行动。
+
+`使用道具 道具名`
+
+开枪前可以使用道具。
+
+需要注意的是使用肾上腺素时需要同时指定对方道具
+
+例如 `使用道具 肾上腺素 手铐` 这样就会使用对方的手铐
+
+如果不指定道具或指定了对方没有的道具你会使用失败（肾上腺素仍会扣除）
+
+**规则**
+
+参考 [buckshot roulette](https://store.steampowered.com/app/2835570/_/) 规则
+
+一些修改：
+
+在子弹打光之后的下一回合会同时清空双方 buff 并切换玩家，而不是闲家回合
+
+手铐可以永动
+
+新增了道具 箱子 可以给两个人各刷一个道具
 
 </details>
 

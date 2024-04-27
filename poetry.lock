@@ -23,10 +23,8 @@ files = [
 ]
 
 [package.dependencies]
-exceptiongroup = {version = ">=1.0.2", markers = "python_version < \"3.11\""}
 idna = ">=2.8"
 sniffio = ">=1.1"
-typing-extensions = {version = ">=4.1", markers = "python_version < \"3.11\""}
 
 [package.extras]
 doc = ["Sphinx (>=7)", "packaging", "sphinx-autodoc-typehints (>=1.2.0)", "sphinx-rtd-theme"]
@@ -74,13 +72,13 @@ files = [
 
 [[package]]
 name = "clovers"
-version = "0.1.6"
+version = "0.1.7"
 description = ""
 optional = false
-python-versions = "<4.0,>=3.10"
+python-versions = "<4.0,>=3.12"
 files = [
-    {file = "clovers-0.1.6-py3-none-any.whl", hash = "sha256:92684de9191f5525121e9b418af291fb85884e6034929470da9103d187477bb1"},
-    {file = "clovers-0.1.6.tar.gz", hash = "sha256:85fd46af8a54ed5d57ad784dc80ec0b02af32a81ad8129b6834d60bfb0376da2"},
+    {file = "clovers-0.1.7-py3-none-any.whl", hash = "sha256:d11f4ebe7f487ada936fd64a54e258ab1355f7fe0c6b48f238f2f1eb494f4e44"},
+    {file = "clovers-0.1.7.tar.gz", hash = "sha256:90a11aa237856348557c233eeb6ee91a9c7ab3f1eccedd3b8b2f47231b3cb220"},
 ]
 
 [package.dependencies]
@@ -188,20 +186,6 @@ files = [
 [package.extras]
 docs = ["ipython", "matplotlib", "numpydoc", "sphinx"]
 tests = ["pytest", "pytest-cov", "pytest-xdist"]
-
-[[package]]
-name = "exceptiongroup"
-version = "1.2.1"
-description = "Backport of PEP 654 (exception groups)"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "exceptiongroup-1.2.1-py3-none-any.whl", hash = "sha256:5258b9ed329c5bbdd31a309f53cbfb0b155341807f6ff7606a1e801a891b29ad"},
-    {file = "exceptiongroup-1.2.1.tar.gz", hash = "sha256:a4785e48b045528f5bfe627b6ad554ff32def154f42372786903b7abcfe1aa16"},
-]
-
-[package.extras]
-test = ["pytest (>=6)"]
 
 [[package]]
 name = "fonttools"
@@ -604,11 +588,7 @@ files = [
 ]
 
 [package.dependencies]
-numpy = [
-    {version = ">=1.22.4", markers = "python_version < \"3.11\""},
-    {version = ">=1.23.2", markers = "python_version == \"3.11\""},
-    {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
-]
+numpy = {version = ">=1.26.0", markers = "python_version >= \"3.12\""}
 python-dateutil = ">=2.8.2"
 pytz = ">=2020.1"
 tzdata = ">=2022.7"
@@ -947,5 +927,5 @@ devenv = ["check-manifest", "pytest (>=4.3)", "pytest-cov", "pytest-mock (>=3.3)
 
 [metadata]
 lock-version = "2.0"
-python-versions = "^3.10"
-content-hash = "ad7e345f61acf3263a5e05b707e866fb044f5384035b008e4d227b32dc9a187f"
+python-versions = "^3.12"
+content-hash = "7a22dc769d9816775b0063c0af816d392ab65c4ea6d64b81cb86685c08773a8b"
