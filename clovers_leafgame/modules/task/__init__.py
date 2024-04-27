@@ -70,13 +70,13 @@ async def _():
 async def _():
     revolution_today = datetime.today().weekday() in {4, 5, 6}
     for user in manager.data.user_dict.values():
-        bank = {k: (v - 1) if prop.flow == 1 else v for k, v in user.bank.items() if (prop := manager.props_library.get(k))}
+        bank = {k: (v - 1) if prop.flow == 0 else v for k, v in user.bank.items() if (prop := manager.props_library.get(k))}
         user.bank = Counter(bank)
     for account in manager.data.account_dict.values():
         # 周末刷新重置签到
         account.extra["revolution"] = revolution_today
         # 群内道具有效期 - 1天
-        bank = {k: (v - 1) if prop.flow == 1 else v for k, v in account.bank.items() if (prop := manager.props_library.get(k))}
+        bank = {k: (v - 1) if prop.flow == 0 else v for k, v in account.bank.items() if (prop := manager.props_library.get(k))}
         account.bank = Counter(bank)
     verification()
     print("每日签到已刷新")
