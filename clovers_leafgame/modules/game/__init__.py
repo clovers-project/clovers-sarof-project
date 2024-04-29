@@ -128,7 +128,7 @@ async def _(event: Event, session: Session):
         count = l_MAG
     shot_tip = f"连开{count}枪！\n" if count > 1 else ""
     if any(MAG[:count]):
-        session.win = session.p2_uid if session.p2_uid == user_id else session.p1_uid
+        session.win = session.p1_uid if session.p2_uid == user_id else session.p2_uid
         random_tip = random.choice(["嘭！，你直接去世了", "眼前一黑，你直接穿越到了异世界...(死亡)", "终究还是你先走一步..."])
         result = f"{shot_tip}{random_tip}\n第 {index + MAG.index(1) + 1} 发子弹送走了你..."
         return session.end(result)
