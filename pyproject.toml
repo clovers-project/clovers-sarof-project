@@ -9,7 +9,7 @@ readme = "README.md"
 python = "^3.12"
 pydantic = "^2.7.0"
 mplfinance = "^0.12.10b0"
-clovers = {extras = ["linecard", "tools"], version = "^0.1.8"}
+clovers = {extras = ["linecard", "tools"], version = "^0.1.9"}
 clovers-apscheduler = "^0.1.4"
 
 
