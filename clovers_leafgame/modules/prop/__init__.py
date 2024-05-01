@@ -1,5 +1,6 @@
 import random
 import asyncio
+from clovers.core.plugin import Finish
 from collections import Counter
 from clovers_leafgame.core.clovers import Event, Check
 from clovers_leafgame.main import plugin, manager
@@ -248,11 +249,12 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     group_id = event.group_id
     rate = 1
 
-    @plugin.temp_handle(f"{user_id} {group_id}", extra_args={"user_id", "group_id"}, timeout=120)
-    async def _(event: Event, finish):
+    @plugin.temp_handle(f"{user_id} {group_id}", extra_args={"user_id", "group_id"}, timeout=60)
+    async def _(event: Event, finish: Finish):
         if event.user_id != user_id or event.group_id != group_id:
             return
-        if event.raw_command == "取消":
+        command = event.raw_command
+        if command == "取消":
             finish()
             if rate == 1:
                 return f"你取消了恶魔轮盘"
@@ -272,31 +274,33 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
             user.bank[STD_GOLD.id] += manager.stock_value(user.invest) * rate
 
             return ["这是你获得的道具", manager.info_card([prop_card(manager.props_data(counter))], user_id)]
+        elif command == "开枪":
+            finish.delay(60)
 
-        if event.raw_command != "开枪":
-            return
+            async def result():
+                bullet_lst = [0, 0, 0, 0, 0, 0]
+                for i in random.sample([0, 1, 2, 3, 4, 5], 3):
+                    bullet_lst[i] = 1
+                index = random.randint(0, 5)
+                yield f"子弹列表{" ".join(str(x) for x in bullet_lst)}，你中了第{index+1}发子弹。"
+                await asyncio.sleep(0.5)
+                nonlocal rate
+                if bullet_lst[index] == 1:
+                    if rate == 1:
+                        manager.data.cancel_user(user_id)
+                        finish()
+                        yield "砰！一团火从枪口喷出，你从这个世界上消失了。"
+                        return
+                    rate //= 2
+                    msg = "砰！一团火从枪口喷出...你被救活了..."
+                else:
+                    rate *= 2
+                    msg = "咔！你活了下来..."
+                yield msg + f"\n当前倍率：{rate}\n请继续开枪，或者取消。"
 
-        async def result():
-            bullet_lst = [0, 0, 0, 0, 0, 0]
-            for i in random.sample([0, 1, 2, 3, 4, 5], 3):
-                bullet_lst[i] = 1
-            index = random.randint(0, 5)
-            yield f"子弹列表{" ".join(str(x) for x in bullet_lst)}，你中了第{index+1}发子弹。"
-            await asyncio.sleep(0.5)
-            nonlocal rate
-            if bullet_lst[index] == 1:
-                if rate == 1:
-                    manager.data.cancel_user(user_id)
-                    finish()
-                    yield "砰！一团火从枪口喷出，你从这个世界上消失了。"
-                    return
-                rate //= 2
-                msg = "砰！一团火从枪口喷出...你被救活了..."
-            else:
-                rate *= 2
-                msg = "咔！你活了下来..."
-            yield msg + f"\n当前倍率：{rate}\n请继续开枪，或者取消。"
-
-        return result()
+            return result()
+        elif command.startswith(("群金库存", "群金库取", "发红包", "送道具", "使用道具")):
+            finish()
+            return "账户锁定中断，恶魔轮盘已取消。"
 
     return "你手中的左轮枪已经装好了子弹，请开枪，或者取消。"
