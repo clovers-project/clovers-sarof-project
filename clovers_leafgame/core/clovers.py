@@ -118,7 +118,7 @@ class Check:
         return self
 
     def locate(self, user_id, group_id):
-        self.checker.append(lambda event: event.user_id == user_id or event.group_id == group_id)
+        self.checker.append(lambda event: event.user_id == user_id and event.group_id == group_id)
         return self
 
     def to_me(self):

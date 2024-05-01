@@ -246,47 +246,56 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     if user.bank[prop.id] < 1:
         return f"使用失败，你没有足够的{prop.name}"
     group_id = event.group_id
+    rate = 1
 
-    @plugin.temp_handle(f"{user_id} {group_id}", extra_args={"user_id", "group_id"})
+    @plugin.temp_handle(f"{user_id} {group_id}", extra_args={"user_id", "group_id"}, timeout=120)
     async def _(event: Event, finish):
         if event.user_id != user_id or event.group_id != group_id:
             return
-        finish()
         if event.raw_command == "取消":
-            return "恶魔轮盘已取消"
+            finish()
+            if rate == 1:
+                return f"你取消了恶魔轮盘"
+
+            def rate_times_bank(bank: Counter, rate: int):
+                for k in bank.keys():
+                    bank[k] *= rate
+
+            counter = Counter()
+            rate_times_bank(user.bank, rate)
+            user.bank[prop.id] = 1
+            counter += user.bank
+            for account_id in user.accounts_map.values():
+                account = manager.data.account_dict[account_id]
+                rate_times_bank(account.bank, rate)
+                counter += account.bank
+            user.bank[STD_GOLD.id] += manager.stock_value(user.invest) * rate
+
+            return ["这是你获得的道具", manager.info_card([prop_card(manager.props_data(counter))], user_id)]
+
         if event.raw_command != "开枪":
             return
 
         async def result():
             bullet_lst = [0, 0, 0, 0, 0, 0]
-            for i in random.sample([0, 1, 2, 3, 4, 5], random.randint(3, 6)):
+            for i in random.sample([0, 1, 2, 3, 4, 5], 3):
                 bullet_lst[i] = 1
             index = random.randint(0, 5)
             yield f"子弹列表{" ".join(str(x) for x in bullet_lst)}，你中了第{index+1}发子弹。"
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
+            nonlocal rate
             if bullet_lst[index] == 1:
-                manager.data.cancel_user(user_id)
-                yield "砰！一团火从枪口喷出，你从这个世界上消失了。"
-                return
-            counter = Counter()
-
-            def ten_times_bank(bank: Counter):
-                for k in bank.keys():
-                    bank[k] *= 10
-
-            ten_times_bank(user.bank)
-            user.bank[prop.id] = 1
-            counter += user.bank
-            for account_id in user.accounts_map.values():
-                account = manager.data.account_dict[account_id]
-                ten_times_bank(account.bank)
-                counter += account.bank
-            user.bank[STD_GOLD.id] += manager.stock_value(user.invest) * 10
-            yield "咔！你活了下来..."
-            yield [
-                "这是你获得的道具",
-                manager.info_card([prop_card(manager.props_data(counter))], user_id),
-            ]
+                if rate == 1:
+                    manager.data.cancel_user(user_id)
+                    finish()
+                    yield "砰！一团火从枪口喷出，你从这个世界上消失了。"
+                    return
+                rate //= 2
+                msg = "砰！一团火从枪口喷出...你被救活了..."
+            else:
+                rate *= 2
+                msg = "咔！你活了下来..."
+            yield msg + f"\n当前倍率：{rate}\n请继续开枪，或者取消。"
 
         return result()
 
