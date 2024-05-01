@@ -44,14 +44,12 @@ class Manager:
                 self.group_library[group.id] = group
 
     def backup(self):
-        now = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-        date_today, now_time = now.split()
+        date_today, now_time = datetime.now().strftime("%Y-%m-%d %H-%M-%S").split()
         backup_today = self.backup_path / date_today
         if not backup_today.exists():
-            backup_today.mkdir()
-        self.save()
+            backup_today.mkdir(mode=755)
         file = backup_today / f"russian_data {now_time}.json"
-        file.write_text(self.data.model_dump_json(indent=4))
+        file.write_text(self.data.model_dump_json(indent=4), "utf8")
 
     def clean_backup(self, delta: int | float):
         folders = [f for f in self.backup_path.iterdir() if f.is_dir()]
@@ -149,7 +147,13 @@ class Manager:
         return int(value)
 
     def invest_data(self, bank: Counter[str]):
-        return [(stock, n) for group_id, n in bank.items() if n != 0 and (stock := self.group_library[group_id].stock)]
+        def get_stock(group_id: str):
+            group = self.group_library.get(group_id)
+            if not group:
+                return
+            return group.stock
+
+        return [(stock, n) for group_id, n in bank.items() if n != 0 and (stock := get_stock(group_id))]
 
     def props_data(self, bank: Counter[str]):
         return [(prop, n) for prop_id, n in bank.items() if n != 0 and (prop := self.props_library.get(prop_id))]

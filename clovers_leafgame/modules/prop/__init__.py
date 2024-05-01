@@ -143,7 +143,6 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     if prop.deal(bank, -1):
         return f"使用失败，你没有足够的{prop.name}"
     GOLD.deal(account.bank, -count)
-
     if random.randint(0, 1) == 0:
         GOLD.deal(account.bank, count * 2)
         return f"你获得了{count}金币"
@@ -200,7 +199,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
 async def _(prop: Prop, event: Event, count: int, extra: str):
     user_id = event.user_id
     bank = manager.data.user(user_id).bank
-    if prop.deal(bank, -1):
+    if bank[prop.id] < 1:
         return f"使用失败，你未持有{prop.name}"
     group_id = event.group_id
     folders = {f.name: f for f in manager.backup_path.iterdir() if f.is_dir()}
@@ -228,6 +227,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
             manager.data.cancel_user(user_id)
             old_data = manager.data.load(file)
             user = manager.data.user_dict[user_id] = old_data.user(user_id)
+            user.bank[prop.id] = bank[prop.id] - 1
             for account_id in user.accounts_map.values():
                 manager.data.register(old_data.account_dict[account_id])
             finish()

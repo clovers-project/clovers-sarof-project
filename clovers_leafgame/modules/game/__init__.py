@@ -76,7 +76,7 @@ async def _(event: Event):
     return session.end()
 
 
-@plugin.handle({"游戏重置"}, {"user_id", "group_id", "permission"})
+@plugin.handle({"游戏重置", "清除对战"}, {"user_id", "group_id", "permission"})
 async def _(event: Event):
     group_id = event.group_id
     session = place.get(group_id)
@@ -987,23 +987,24 @@ async def _(event: Event, session: Session):
 @buckshot_roulette.action(place)
 async def _(event: Event, session: Session):
     prop_key = event.single_arg()
-    if not prop_key:
+    prop_tips = {
+        "手铐": "对方一回合无法行动",
+        "短锯": "本发子弹伤害翻倍",
+        "放大镜": "查看本发子弹",
+        "香烟": "增加1点血量",
+        "啤酒": "退一发子弹",
+        "逆转器": "转换当前枪膛里面的子弹真假",
+        "过期药品": "50%的概率回两滴血，剩下的概率扣一滴血",
+        "肾上腺素": "偷取对方的道具并立即使用",
+        "手机": "查看接下来第n发子弹真假",
+        "箱子": "每人抽取一件道具",
+    }
+    if not prop_key or prop_key not in prop_tips:
         return
     session.delay()
 
     def use(session: Session, prop_key: str):
-        prop_tips = {
-            "手铐": "对方一回合无法行动",
-            "短锯": "本发子弹伤害翻倍",
-            "放大镜": "查看本发子弹",
-            "香烟": "增加1点血量",
-            "啤酒": "退一发子弹",
-            "逆转器": "转换当前枪膛里面的子弹真假",
-            "过期药品": "50%的概率回两滴血，剩下的概率扣一滴血",
-            "肾上腺素": "偷取对方的道具并立即使用",
-            "手机": "查看接下来第n发子弹真假",
-            "箱子": "每人抽取一件道具",
-        }
+
         if session.next == session.p1_uid:
             self_key = "1"
             others_key = "2"
