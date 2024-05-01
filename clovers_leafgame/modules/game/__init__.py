@@ -1,7 +1,7 @@
 import random
 import asyncio
 from collections import Counter
-from clovers_leafgame.main import plugin, manager
+from clovers_leafgame.main import plugin, manager, build_result
 from clovers_leafgame.core.clovers import Event
 from clovers_leafgame.output import text_to_image, BytesIO
 from .core import Session, Game, to_int
@@ -679,7 +679,7 @@ async def _(event: Event, session: Session):
     if pt > 21:
         await event.send_group_message(
             session.group_id,
-            plugin.build_result(session.end(msg)),
+            build_result(session.end(msg)),
         )
     if not event.is_private():
         msg = "请在私信抽牌\n" + msg
@@ -694,7 +694,7 @@ async def _(event: Event, session: Session):
         result = f"请{session.p2_nickname}抽牌|停牌|双倍停牌"
     else:
         result = blackjack_end(session)
-    await event.send_group_message(session.group_id, plugin.build_result(result))
+    await event.send_group_message(session.group_id, build_result(result))
 
 
 @plugin.handle({"双倍停牌"}, {"user_id", "group_id"})
@@ -707,9 +707,9 @@ async def _(event: Event, session: Session):
     session.nextround()
     msg = f"你的手牌：\n{poker_show(hand,'\n')}\n合计:{pt}点"
     if pt > 21:
-        await event.send_group_message(session.group_id, plugin.build_result(session.end(msg)))
+        await event.send_group_message(session.group_id, build_result(session.end(msg)))
     else:
-        await event.send_group_message(session.group_id, plugin.build_result(f"请{session.p2_nickname}{blackjack.action_tip}"))
+        await event.send_group_message(session.group_id, build_result(f"请{session.p2_nickname}{blackjack.action_tip}"))
         return msg
 
 
@@ -753,7 +753,7 @@ async def _(event: Event, session: Session):
     if event.user_id == session.p1_uid:
         await event.send_group_message(
             session.group_id,
-            plugin.build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
+            build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
         )
         return tip
     if card in {"开枪", "闪枪"}:
@@ -776,7 +776,7 @@ async def _(event: Event, session: Session):
     if event.user_id == session.p1_uid:
         await event.send_group_message(
             session.group_id,
-            plugin.build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
+            build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
         )
         return tip
     if card == "闪枪":
@@ -799,7 +799,7 @@ async def _(event: Event, session: Session):
     if event.user_id == session.p1_uid:
         await event.send_group_message(
             session.group_id,
-            plugin.build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
+            build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
         )
         return tip
     if card == "预判开枪":
@@ -822,7 +822,7 @@ async def _(event: Event, session: Session):
     if event.user_id == session.p1_uid:
         await event.send_group_message(
             session.group_id,
-            plugin.build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
+            build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
         )
         return tip
     if card == "预判开枪":
@@ -848,7 +848,7 @@ async def _(event: Event, session: Session):
     if not card:
         await event.send_group_message(
             session.group_id,
-            plugin.build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
+            build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
         )
         return tip
     if card == "开枪":
