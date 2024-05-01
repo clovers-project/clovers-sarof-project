@@ -1,7 +1,7 @@
 import random
 import asyncio
-from clovers.core.plugin import Finish
 from collections import Counter
+from clovers.core.plugin import Plugin
 from clovers_leafgame.core.clovers import Event, Check
 from clovers_leafgame.main import plugin, manager
 from clovers_leafgame.item import Prop, GOLD, STD_GOLD
@@ -250,7 +250,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     rate = 1
 
     @plugin.temp_handle(f"{user_id} {group_id}", extra_args={"user_id", "group_id"}, timeout=60)
-    async def _(event: Event, finish: Finish):
+    async def _(event: Event, finish: Plugin.Finish):
         if event.user_id != user_id or event.group_id != group_id:
             return
         command = event.raw_command
