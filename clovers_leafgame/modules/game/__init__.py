@@ -727,7 +727,7 @@ async def _(session: Session, arg: str):
         tip = f"\n本场下注：{n}{prop.name}/轮"
     else:
         tip = ""
-    return f"西部对战场地已创建。{tip}\n{session.create_info()}"
+    return f"【西部对战】游戏已创建。{tip}\n{session.create_info()}"
 
 
 def western_duel_action(event: Event, session: Session, card: str):
@@ -927,7 +927,7 @@ async def _(session: Session, arg: str):
     else:
         tip = ""
     session.start_tips = [buckshot_roulette_loading(session), buckshot_roulette_status(session)]
-    return f"【恶魔轮盘】场地已创建。{tip}\n{session.create_info()}"
+    return f"【恶魔轮盘】游戏已创建。{tip}\n{session.create_info()}"
 
 
 @plugin.handle(r"向(自己|对方)开枪$", {"user_id", "group_id"})

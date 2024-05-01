@@ -247,23 +247,19 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         return f"使用失败，你没有足够的{prop.name}"
     group_id = event.group_id
 
-    def ten_times_bank(bank: Counter):
-        for k in bank.keys():
-            bank[k] *= 10
-
     @plugin.temp_handle(f"{user_id} {group_id}", extra_args={"user_id", "group_id"})
-    async def _(event_1: Event, finish):
-        if event_1.user_id != user_id or event_1.group_id != group_id:
+    async def _(event: Event, finish):
+        if event.user_id != user_id or event.group_id != group_id:
             return
         finish()
-        if event_1.raw_command == "取消":
+        if event.raw_command == "取消":
             return "恶魔轮盘已取消"
-        if event_1.raw_command != "开枪":
+        if event.raw_command != "开枪":
             return
 
         async def result():
             bullet_lst = [0, 0, 0, 0, 0, 0]
-            for i in random.sample([0, 1, 2, 3, 4, 5], random.randint(0, 6)):
+            for i in random.sample([0, 1, 2, 3, 4, 5], random.randint(3, 6)):
                 bullet_lst[i] = 1
             index = random.randint(0, 5)
             yield f"子弹列表{" ".join(str(x) for x in bullet_lst)}，你中了第{index+1}发子弹。"
@@ -273,6 +269,11 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
                 yield "砰！一团火从枪口喷出，你从这个世界上消失了。"
                 return
             counter = Counter()
+
+            def ten_times_bank(bank: Counter):
+                for k in bank.keys():
+                    bank[k] *= 10
+
             ten_times_bank(user.bank)
             user.bank[prop.id] = 1
             counter += user.bank
