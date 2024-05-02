@@ -241,7 +241,9 @@ async def _(event: Event):
 async def _(event: Event):
     if event.is_private() or not (args := event.args_parse()):
         return
-    command, N = args[:2]
+    command, n = args[:2]
+    if len(command) < 2:
+        return
     user_id = event.user_id
     group_id = event.group_id
     group = manager.data.group(group_id)
@@ -256,8 +258,16 @@ async def _(event: Event):
             info.append(invest_card(data, "群投资"))
         return manager.info_card(info, user_id) if info else "群金库是空的"
     sign, name = command[0], command[1:]
-    if not name:
-        pass
+    match sign:
+        case "存":
+            sign = 1
+        case "取":
+            sign = -1
+        case _:
+            return
+    if n < 0:
+        n = -n
+        sign = -sign
     user, account = manager.locate_account(user_id, group_id)
     if item := manager.props_library.get(name):
         bank_in = group.bank
@@ -266,21 +276,20 @@ async def _(event: Event):
         bank_in = group.invest
         bank_out = user.invest
     else:
-        return f"没有名为【{name}】的道具或股票。"
-
-    if sign == "取":
+        return
+    if sign == 1:
+        sender = "你"
+        receiver = "群金库"
+    else:
         if not event.permission:
             return f"你的权限不足。"
         bank_out, bank_in = bank_in, bank_out
         sender = "群金库"
-    elif sign == "存":
-        sender = "你"
-    else:
-        return
-    if n := item.deal(bank_out, -N):
-        return f"{command}失败，{sender}还有{n}个{item.name}。"
-    item.deal(bank_in, N)
-    return f"你在群金库{sign}了{N}个{item.name}"
+        receiver = "你"
+    if bank_n := item.deal(bank_out, -n):
+        return f"{command}失败，{sender}还有{bank_n}个{item.name}。"
+    item.deal(bank_in, n)
+    return f"{sender}向{receiver}转移了{n}个{item.name}"
 
 
 @plugin.handle({"群资料卡"}, {"user_id", "group_id", "nickname"})
@@ -289,24 +298,17 @@ async def _(event: Event):
     群资料卡
     """
     group_name = event.single_arg()
-    if group_name and (group := manager.group_library.get(group_name)):
-        pass
+    if group_name and not (group := manager.group_library.get(group_name)):
+        return f"未找到【{group_name}】"
     else:
-        user, group_account = manager.account(event)
-        group = manager.data.group(group_account.group_id)
+        group = manager.data.group(event.group_id)
     info = []
     lines = [
         f"{datetime.fromtimestamp(stock.time).strftime('%Y年%m月%d日')if (stock :=group.stock) else '未发行'}",
         f"等级 {group.level}",
         f"成员 {len(group.accounts_map)}",
     ]
-    info.append(
-        avatar_card(
-            await download_url(avatar_url) if (avatar_url := group.avatar_url) else None,
-            group.nickname,
-            lines,
-        )
-    )
+    info.append(avatar_card(await download_url(avatar_url) if (avatar_url := group.avatar_url) else None, group.nickname, lines))
     if ranklist := group.extra.get("revolution_achieve"):
         ranklist = list(ranklist.items())
         ranklist.sort(key=lambda x: x[1], reverse=True)
