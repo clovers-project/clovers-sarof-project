@@ -121,15 +121,17 @@ async def _(event: Event):
     group_out = manager.data.group(event.group_id or user.connect)
     if not (sender_account_id := user.accounts_map.get(group_out.id)):
         return "你在本群没有帐户"
-    if (n := group_out.bank[GOLD.id]) < company_public_gold:
+    if (n := group_out.bank[STD_GOLD.id]) < company_public_gold:
         return f"本群金币过少（{n}<{company_public_gold}），无法完成结算"
-    bank_out = manager.data.account_dict[sender_account_id].bank
+    if (n := group_in.bank[STD_GOLD.id]) < company_public_gold:
+        return f"【{group_in.nickname}】金币过少（{n}<{company_public_gold}），无法完成结算"
     bank_in = manager.data.account_dict[receiver_account_id].bank
+    bank_out = manager.data.account_dict[sender_account_id].bank
     if xfer < 0:
+        xfer = -xfer
         bank_out, bank_in = bank_in, bank_out
         group_out, group_in = group_in, group_out
-        xfer = -xfer
-    ExRate = group_in.level / group_out.level
+    ExRate = group_out.level / group_in.level
     receipt = xfer * ExRate
     if receipt < 1:
         return f"转入金币{round(receipt,2)}不可小于1枚（汇率：{round(ExRate,2)}）。"
@@ -153,16 +155,18 @@ async def _(event: Event):
         return "请输入注册名"
     if check := item_name_rule(stock_name):
         return check
-    if manager.group_library.get(stock_name):
+    if manager.group_library.get(stock_name) or manager.props_library.get(stock_name):
         return f"{stock_name} 已被注册"
+    if (gold := group.bank[GOLD.id]) < company_public_gold:
+        return f"本群金库金币（{gold}）小于{company_public_gold}，注册失败。"
     wealths = manager.group_wealths(group_id, GOLD.id)
     stock_value = sum(wealths)
-    if stock_value < company_public_gold:
-        return f"本群金币（{stock_value}）小于{company_public_gold}，注册失败。"
     gini = gini_coef([x for x in wealths[:-1] if x >= gini_filter_gold])
     if gini > revolt_gini:
         return f"本群基尼系数（{round(gini,3)}）过高，注册失败。"
     level = group.level = (sum(ra.values()) if (ra := group.extra.get("revolution_achieve")) else 0) + 1
+    group.bank[STD_GOLD.id] += gold * level
+    group.bank[GOLD.id] = 0
     stock_value *= level
     stock = Stock(
         id=group_id,
