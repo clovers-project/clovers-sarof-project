@@ -1,5 +1,7 @@
 import random
 import asyncio
+import time
+from datetime import datetime, timedelta
 from collections import Counter
 from clovers.core.plugin import Plugin
 from clovers_leafgame.core.clovers import Event, Check
@@ -246,61 +248,55 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     user = manager.data.user(user_id)
     if user.bank[prop.id] < 1:
         return f"使用失败，你没有足够的{prop.name}"
-    group_id = event.group_id
-    rate = 1
+    # 增加一步验证，判断玩家是否一星期内失败过。
+    death_cd: dict[str, float] = manager.data.extra.setdefault("death_cd", {})
+    if user_id in death_cd:
+        death_date = datetime.fromtimestamp(death_cd[user_id])
+        revival_date = (death_date + timedelta(days=7 - death_date.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        if datetime.now() < revival_date:
+            return f"您需要在{revival_date.strftime('%Y年%m月%d日')}后才能使用此道具"
+        del death_cd[user_id]
 
     @plugin.temp_handle(f"{user_id} {group_id}", extra_args={"user_id", "group_id"}, timeout=60)
     async def _(event: Event, finish: Plugin.Finish):
         if event.user_id != user_id or event.group_id != group_id:
             return
+        finish()
         command = event.raw_command
         if command == "取消":
-            finish()
-            if rate == 1:
-                return f"你取消了恶魔轮盘"
-
-            def rate_times_bank(bank: Counter, rate: int):
-                for k in bank.keys():
-                    bank[k] *= rate
-
-            counter = Counter()
-            rate_times_bank(user.bank, rate)
-            user.bank[prop.id] = 1
-            counter += user.bank
-            for account_id in user.accounts_map.values():
-                account = manager.data.account_dict[account_id]
-                rate_times_bank(account.bank, rate)
-                counter += account.bank
-            user.bank[STD_GOLD.id] += manager.stock_value(user.invest) * rate
-
-            return ["这是你获得的道具", manager.info_card([prop_card(manager.props_data(counter))], user_id)]
+            return f"你取消了恶魔轮盘"
         elif command == "开枪":
-            finish.delay(60)
 
             async def result():
                 bullet_lst = [0, 0, 0, 0, 0, 0]
-                for i in random.sample([0, 1, 2, 3, 4, 5], 3):
+                for i in random.sample([0, 1, 2, 3, 4, 5], random.randint(0, 6)):
                     bullet_lst[i] = 1
                 index = random.randint(0, 5)
                 yield f"子弹列表{" ".join(str(x) for x in bullet_lst)}，你中了第{index+1}发子弹。"
                 await asyncio.sleep(0.5)
-                nonlocal rate
                 if bullet_lst[index] == 1:
-                    if rate == 1:
-                        manager.data.cancel_user(user_id)
-                        finish()
-                        yield "砰！一团火从枪口喷出，你从这个世界上消失了。"
-                        return
-                    rate //= 2
-                    msg = "砰！一团火从枪口喷出...你被救活了..."
+                    death_cd[user_id] = time.time()
+                    manager.data.cancel_user(user_id)
+                    yield "砰！一团火从枪口喷出，你从这个世界上消失了。"
                 else:
-                    rate *= 2
-                    msg = "咔！你活了下来..."
-                yield msg + f"\n当前倍率：{rate}\n请继续开枪，或者取消。"
+                    yield "咔！你活了下来..."
+
+                    def rate_times_bank(bank: Counter, rate: int):
+                        for k in bank.keys():
+                            bank[k] *= rate
+
+                    counter = Counter()
+                    rate_times_bank(user.bank, 10)
+                    user.bank[prop.id] = 1
+                    counter += user.bank
+                    for account_id in user.accounts_map.values():
+                        account = manager.data.account_dict[account_id]
+                        rate_times_bank(account.bank, 10)
+                        counter += account.bank
+                    user.bank[STD_GOLD.id] += manager.stock_value(user.invest) * 10
+
+                    yield ["这是你获得的道具", manager.info_card([prop_card(manager.props_data(counter))], user_id)]
 
             return result()
-        elif command.startswith(("群金库存", "群金库取", "发红包", "送道具", "使用道具")):
-            finish()
-            return "账户锁定中断，恶魔轮盘已取消。"
 
     return "你手中的左轮枪已经装好了子弹，请开枪，或者取消。"
