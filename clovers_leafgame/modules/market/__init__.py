@@ -68,7 +68,8 @@ async def _(event: Event):
 @plugin.handle({"重置签到", "领取金币"}, {"user_id", "group_id", "nickname", "avatar"})
 async def _(event: Event):
     user, account = manager.account(event)
-    user.avatar_url = event.avatar
+    if avatar := event.avatar:
+        user.avatar_url = avatar
     extra = account.extra
     if not extra.setdefault("revolution", True):
         return "你没有待领取的金币"
@@ -146,7 +147,8 @@ async def _(event: Event):
 async def _(event: Event):
     group_id = event.group_id
     group = manager.data.group(group_id)
-    group.avatar_url = event.group_avatar
+    if group_avatar := event.group_avatar:
+        group.avatar_url = group_avatar
     stock = group.stock
     if stock:
         return f"本群已在市场注册，注册名：{stock.name}"

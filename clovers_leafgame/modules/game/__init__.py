@@ -748,7 +748,7 @@ async def _(event: Event, session: Session):
         return tip
     session.nextround()
     session.data[MAG] += 1
-    session.data[MAG] = min(session.data["MAG2"], 6)
+    session.data[MAG] = min(session.data[MAG], 6)
     card = session.data["card"]
     if event.user_id == session.p1_uid:
         await event.send_group_message(

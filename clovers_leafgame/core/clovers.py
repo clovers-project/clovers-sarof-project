@@ -43,7 +43,7 @@ class Event:
         return self.group_id is None
 
     @property
-    def avatar(self) -> str:
+    def avatar(self) -> str | None:
         return self.event.kwargs["avatar"]
 
     @property
@@ -51,7 +51,7 @@ class Event:
         return self.event.kwargs["image_list"]
 
     @property
-    def group_avatar(self) -> str:
+    def group_avatar(self) -> str | None:
         return self.event.kwargs["group_avatar"]
 
     def args_to_int(self):

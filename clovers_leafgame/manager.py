@@ -90,9 +90,11 @@ class Manager:
         account_id = user.accounts_map.get(group_id)
         if not (account_id and (account := self.data.account_dict.get(account_id))):
             account = self.new_account(user_id, group_id)
-        if not user.name or event.is_private():
-            user.name = event.nickname
-        account.name = event.nickname
+        nickname = event.nickname
+        if event.nickname:
+            account.name = nickname
+            if not user.name or event.is_private():
+                user.name = event.nickname
         return user, account
 
     def transfer(

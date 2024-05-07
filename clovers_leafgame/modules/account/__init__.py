@@ -86,7 +86,8 @@ async def _(event: Event):
 @plugin.handle({"金币签到", "轮盘签到"}, {"user_id", "group_id", "nickname", "avatar"})
 async def _(event: Event):
     user, account = manager.account(event)
-    user.avatar_url = event.avatar
+    if avatar := event.avatar:
+        user.avatar_url = avatar
     today = datetime.today()
     if account.sign_in and (today - account.sign_in).days == 0:
         return "你已经签过到了哦"
