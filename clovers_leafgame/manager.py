@@ -7,6 +7,7 @@
 
 from datetime import datetime, timedelta
 from pathlib import Path
+import shutil
 from collections import Counter
 from clovers.utils.linecard import info_splicing, ImageList
 from clovers.utils.library import Library
@@ -54,9 +55,10 @@ class Manager:
     def clean_backup(self, delta: int | float):
         folders = [f for f in self.backup_path.iterdir() if f.is_dir()]
         info = []
+        timestamp = datetime.now().timestamp()
         for folder in folders:
-            if datetime.now().timestamp() - folder.stat().st_birthtime > delta:
-                folder.unlink(True)
+            if timestamp - folder.stat().st_birthtime > delta:
+                shutil.rmtree(folder)
                 info.append(f"备份 {folder} 已删除！")
         return "\n".join(info)
 
