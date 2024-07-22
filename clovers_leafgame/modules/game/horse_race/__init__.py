@@ -75,7 +75,7 @@ class RaceWorld:
             else:
                 self.only_keys.add(only_key)
         # 读取 target 目标，计算<0><1>， target_name_0 ， target_name_1
-        target_name_0 = horse.horse_fullname
+        target_name_0 = horse.horse
         match event.target:
             case 0:
                 targets = [horse]
@@ -83,7 +83,7 @@ class RaceWorld:
             case 1:
                 target = random.choice([x for x in self.racetrack if not x is horse])
                 targets = [target]
-                target_name_1 = target.horse_fullname
+                target_name_1 = target.horse
             case 2:
                 targets = self.racetrack
                 target_name_1 = "所有马儿"
@@ -93,22 +93,22 @@ class RaceWorld:
             case 4:
                 target = random.choice(self.racetrack)
                 targets = [target]
-                target_name_1 = target.horse_fullname
+                target_name_1 = target.horse
             case 5:
                 target = random.choice([x for x in self.racetrack if not x is horse])
                 targets = [target, horse]
-                target_name_1 = target.horse_fullname
+                target_name_1 = target.horse
             case 6:
                 index = self.racetrack.index(horse)
                 side = [x for x in [index + 1, index - 1] if 0 <= x < len(self.racetrack)]
                 target = self.racetrack[random.choice(side)]
                 targets = [target]
-                target_name_1 = target.horse_fullname
+                target_name_1 = target.horse
             case 7:
                 index = self.racetrack.index(horse)
                 side = [x for x in [index + 1, index - 1] if 0 <= x < len(self.racetrack)]
                 targets = [self.racetrack[i] for i in side]
-                target_name_1 = f"在{horse.horse_fullname}两侧的马儿"
+                target_name_1 = f"在{horse.horse}两侧的马儿"
             case _:
                 return
         # 判定 target_is_buff
@@ -142,7 +142,8 @@ class RaceWorld:
         if event.track_random_location == 1:
             action(
                 targets,
-                lambda horse, random_move_range: horse.location_to(random.randint(*random_move_range), self.random_move_range),
+                lambda horse, random_move_range: horse.location_to(random.randint(*random_move_range)),
+                self.random_move_range,
             )
         if event.buff_time_add:
             action(targets, lambda horse, time_add: horse.buff_addtime(time_add), event.buff_time_add)
@@ -256,8 +257,6 @@ class RaceWorld:
             horse.location_add_move = 0
             # 移除超时buff
             horse.buff = [buff for buff in horse.buff if buff.round_end >= self.round]
-            # 马儿全名计算
-            horse.fullname()
             # 延时事件触发
             for delay_round, delay_event in horse.delay_events:
                 if self.round == delay_round:
@@ -268,12 +267,16 @@ class RaceWorld:
                 if buff.event_in_buff:
                     buff_event = self.roll_event(buff.event_in_buff)
                     event_log.append(self.event_main(horse, buff_event, 1))
-            # 随机事件判定
-            if random.randint(1, 1000) <= self.event_randvalue:
-                event = random.choice(self.event_list)
-                event_log.append(self.event_main(horse, event))
             # 马儿移动,包含死亡/离开/止步判定
-            horse.move(*self.base_move_range, self.track_length)
+            if horse.is_stop() or horse.is_die() or horse.is_away():
+                base_move = 0
+            else:
+                base_move = horse.base_move(*self.base_move_range)
+                # 随机事件判定
+                if random.randint(1, 1000) <= self.event_randvalue:
+                    event = random.choice(self.event_list)
+                    event_log.append(self.event_main(horse, event))
+            horse.move(base_move, self.track_length)
         return "\n".join(x for x in event_log if x)
 
     def is_die_all(self) -> bool:

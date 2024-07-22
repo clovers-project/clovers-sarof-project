@@ -100,6 +100,9 @@ class Buff(BaseModel):
     """
     event_in_buff: Event_list
 
+    def info(self):
+        return f"buff名称：{self.name}\n回合：{self.round_start} - {self.round_end}\n标签：{self.buffs}"
+
 
 class Horse:
     def __init__(self, horsename, uid, id, location=0, round=0):
@@ -108,11 +111,19 @@ class Horse:
         self.player = id
         self.buff: list[Buff] = []
         self.delay_events: Event_list = []
-        self.horse_fullname = horsename
         self.round = round
         self.location = location
         self.location_add = 0
         self.location_add_move = 0
+
+    def info(self):
+        return (
+            f"马儿：{self.horse}\n"
+            f"回合：{self.round}\n"
+            f"位置：{self.location}\n"
+            f"本回合移动：{self.location_add}\n"
+            f"当前buff：\n{'\n'.join(buff.info() for  buff in self.buff)}\n"
+        )
 
     def add_buff(
         self,
@@ -163,10 +174,6 @@ class Horse:
         """马儿是否已经死亡"""
         return self.find_buff("die")
 
-    # =====马儿全名带buff显示：
-    def fullname(self):
-        self.horse_fullname = "".join(f"<{buff.name}>" for buff in self.buff) + self.horse
-
     def location_move(self, move):
         """马儿移动计算（事件提供的本回合移动）"""
         self.location_add_move += move
@@ -175,15 +182,16 @@ class Horse:
         """马儿移动至特定位置计算（事件提供移动）"""
         self.location_add_move = move_to - self.location
 
-    def move(self, move_min: int, move_max: int, track_length: int):
+    def base_move(self, move_min: int, move_max: int) -> int:
+        """马儿基础移动计算"""
+        for buff in self.buff:
+            move_min += buff.move_min
+            move_max += buff.move_max
+        base_move = random.randint(move_min, move_max)
+        return base_move
+
+    def move(self, base_move: int, track_length: int):
         """马儿移动计算"""
-        if self.is_stop() or self.is_die() or self.is_away():
-            base_move = 0
-        else:
-            for buff in self.buff:
-                move_min += buff.move_min
-                move_max += buff.move_max
-            base_move = random.randint(move_min, move_max)
         self.location_add = base_move + self.location_add_move
         self.location += self.location_add
         self.location = max(0, self.location)
@@ -196,5 +204,5 @@ class Horse:
 
         start = f"[{self.location_add}]" if self.location_add < 0 else f"[+{self.location_add}]"
         track = ["." for _ in range(track_length - 1)]
-        track.insert(-self.location, self.horse_fullname)
+        track.insert(track_length - self.location, "".join(f"<{buff.name}>" for buff in self.buff) + self.horse)
         return start + "".join(track)
