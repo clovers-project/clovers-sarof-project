@@ -1126,7 +1126,8 @@ async def _(event: Event):
         return
     if session.game.name != horse_race_game.name:
         return
-    world: RaceWorld = session.data["world"]
+    world = session.data["world"]
+    assert isinstance(world, RaceWorld)
     if world.status == 1:
         return
     player_count = len(world.racetrack)

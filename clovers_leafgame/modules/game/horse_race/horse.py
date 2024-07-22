@@ -196,5 +196,5 @@ class Horse:
 
         start = f"[{self.location_add}]" if self.location_add < 0 else f"[+{self.location_add}]"
         track = ["." for _ in range(track_length - 1)]
-        track.insert(self.location, self.horse_fullname)
+        track.insert(-self.location, self.horse_fullname)
         return start + "".join(track)
