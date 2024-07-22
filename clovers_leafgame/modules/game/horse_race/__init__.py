@@ -66,7 +66,7 @@ class RaceWorld:
 
     def event_main(self, horse: Horse, event: Event, event_delay_key=0):
         # 该马儿是否死亡/离开/眩晕，死亡则结束事件链
-        if event_delay_key == 0 and (horse.is_die() or horse.is_away() or horse.find_buff("vertigo")):
+        if event_delay_key == 0 and (horse.is_die or horse.is_away or horse.find_buff("vertigo")):
             return
         # 读取事件限定值
         if only_key := event.only_key:
@@ -183,7 +183,6 @@ class RaceWorld:
                 move_max: int = 0,
                 event_in_buff: Event_list = [],
             ):
-                horse.del_buff(buff_name)
                 horse.add_buff(buff_name, buffs, round_start, round_end, move_min, move_max, event_in_buff)
 
             action(
@@ -268,10 +267,13 @@ class RaceWorld:
                     buff_event = self.roll_event(buff.event_in_buff)
                     event_log.append(self.event_main(horse, buff_event, 1))
             # 马儿移动,包含死亡/离开/止步判定
-            if horse.is_stop() or horse.is_die() or horse.is_away():
+            if horse.is_die or horse.is_away:
                 base_move = 0
             else:
-                base_move = horse.base_move(*self.base_move_range)
+                if horse.is_stop:  # 止步不影响主动事件
+                    base_move = 0
+                else:
+                    base_move = horse.base_move(*self.base_move_range)
                 # 随机事件判定
                 if random.randint(1, 1000) <= self.event_randvalue:
                     event = random.choice(self.event_list)
@@ -283,4 +285,4 @@ class RaceWorld:
         """
         所有马儿是否死亡/离开
         """
-        return all(horse.is_die() or horse.is_away() for horse in self.racetrack)
+        return all(horse.is_die or horse.is_away for horse in self.racetrack)

@@ -162,14 +162,17 @@ class Horse:
         for buff in self.buff:
             buff.round_end += round_add
 
+    @property
     def is_stop(self) -> bool:
         """马儿是否止步"""
         return self.find_buff("locate_lock")
 
+    @property
     def is_away(self) -> bool:
         """马儿是否已经离开"""
         return self.find_buff("away")
 
+    @property
     def is_die(self) -> bool:
         """马儿是否已经死亡"""
         return self.find_buff("die")
