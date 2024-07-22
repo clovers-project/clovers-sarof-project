@@ -195,7 +195,7 @@ class Horse:
         self.location_add = base_move + self.location_add_move
         self.location += self.location_add
         self.location = max(0, self.location)
-        self.location = min(track_length, self.location)
+        self.location = min(track_length - 1, self.location)
 
     # =====赛马玩家战况显示：
     def display(self, track_length: int):
@@ -204,5 +204,5 @@ class Horse:
 
         start = f"[{self.location_add}]" if self.location_add < 0 else f"[+{self.location_add}]"
         track = ["." for _ in range(track_length - 1)]
-        track.insert(track_length - self.location, "".join(f"<{buff.name}>" for buff in self.buff) + self.horse)
+        track.insert(track_length - 1 - self.location, "".join(f"<{buff.name}>" for buff in self.buff) + self.horse)
         return start + "".join(track)
