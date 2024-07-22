@@ -188,7 +188,7 @@ class RaceWorld:
             action(
                 targets,
                 lambda horse, *args: add_buff(horse, *args),
-                event.away_name,
+                event.name,
                 event.buffs,
                 self.round + 1,
                 self.round + event.rounds,
