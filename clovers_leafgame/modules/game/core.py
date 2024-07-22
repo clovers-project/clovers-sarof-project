@@ -145,7 +145,7 @@ class Session:
         return result
 
     def end(self, result=None):
-        self.time = 0
+        self.time = -1
         settle = self.settle()
 
         async def output():
@@ -170,19 +170,21 @@ class Game:
             case 0:
                 return "", 0, ""
             case 1:
-                name = args[0]
-                n = to_int(name)
-                if n is None:
-                    n = 0
-                else:
-                    name = ""
-                return name, n, ""
+                arg = args[0]
+                return arg, 0, ""
             case 2:
                 name, n = args
                 return name, to_int(n) or 0, ""
             case _:
-                name, n, arg = args[:3]
-                return name, to_int(n) or 0, arg
+                arg, n, name = args[:3]
+                if num := to_int(n):
+                    n = num
+                elif num := to_int(name):
+                    name = n
+                    n = num
+                else:
+                    n = 0
+                return arg, n, name
 
     @staticmethod
     def session_check(place: dict[str, Session], group_id: str):
@@ -200,7 +202,7 @@ class Game:
                 group_id = event.group_id
                 if (session := self.session_check(place, group_id)) and (tip := session.create_check(user_id)):
                     return tip
-                prop_name, n, arg = self.args_parse(event.args)
+                arg, n, prop_name = self.args_parse(event.args)
                 prop = manager.props_library.get(prop_name, GOLD)
                 user, account = manager.locate_account(user_id, group_id)
                 user.connect = group_id
@@ -226,7 +228,7 @@ class Game:
             async def wrapper(event: Event):
                 group_id = event.group_id or manager.data.user(event.user_id).connect
                 session = place.get(group_id)
-                if not session or session.game.name != self.name:
+                if not session or session.game.name != self.name or session.time == -1:
                     return
                 user_id = event.user_id
                 if tip := session.action_check(user_id):

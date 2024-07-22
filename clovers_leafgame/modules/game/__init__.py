@@ -913,7 +913,12 @@ def buckshot_roulette_loading(session: Session):
 @plugin.handle({"恶魔轮盘"}, {"user_id", "group_id", "at"})
 @buckshot_roulette.create(place)
 async def _(session: Session, arg: str):
-    hp = random.randint(3, 6)
+    hp = to_int(arg)
+    if hp is None or hp > 6 or hp < 3:
+        hp = random.randint(3, 6)
+        tip = ""
+    else:
+        tip = f"\n本轮对决已设置血量：{hp}"
     session.data["HP_MAX"] = hp
     session.data["HP1"] = hp
     session.data["HP2"] = hp
@@ -923,9 +928,7 @@ async def _(session: Session, arg: str):
     session.data["props2"] = []
     if session.bet:
         prop, n = session.bet
-        tip = f"\n本场下注：{n}{prop.name}/轮"
-    else:
-        tip = ""
+        tip += f"\n本场下注：{n}{prop.name}/轮"
     session.start_tips = [buckshot_roulette_loading(session), buckshot_roulette_status(session)]
     return f"【恶魔轮盘】游戏已创建。{tip}\n{session.create_info()}"
 
