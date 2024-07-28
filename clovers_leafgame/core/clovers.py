@@ -1,4 +1,5 @@
-from clovers.core.plugin import Event as CloversEvent, Plugin
+from collections.abc import Callable
+from clovers.core.plugin import Event as CloversEvent
 from clovers.utils.tools import to_int
 
 
@@ -120,12 +121,5 @@ class Rule:
         return bool(event.at)
 
     @staticmethod
-    def locate(user_id: str, group_id: str):
-        def decorator(func):
-            async def wrapper(event: Event, finish: Plugin.Finish):
-                if event.user_id == user_id and event.group_id == group_id:
-                    return await func(event, finish)
-
-            return wrapper
-
-        return decorator
+    def locate(user_id: str, group_id: str) -> Callable[[Event], bool]:
+        return lambda e: e.user_id == user_id and e.group_id == group_id

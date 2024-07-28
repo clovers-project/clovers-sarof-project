@@ -212,8 +212,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     tip = "请输入你要回档的日期:\n" + "\n".join(folders.keys())
     key = f"{user_id} {group_id}"
 
-    @plugin.temp_handle(key, extra_args=["user_id", "group_id"])
-    @Rule.locate(user_id, group_id)
+    @plugin.temp_handle(key, extra_args=["user_id", "group_id"], rule=Rule.locate(user_id, group_id))
     async def _(event: Event, finish):
         date = event.raw_command
         folder = folders.get(date)
@@ -223,8 +222,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         tip2 = "请输入你要回档的时间:\n" + "\n".join(files.keys())
         finish()
 
-        @plugin.temp_handle(key, extra_args=["user_id", "group_id"])
-        @Rule.locate(user_id, group_id)
+        @plugin.temp_handle(key, extra_args=["user_id", "group_id"], rule=Rule.locate(user_id, group_id))
         async def _(event: Event, finish):
             clock = event.raw_command
             file = files.get(clock)
@@ -260,8 +258,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
             return f"您需要在{revival_date.strftime('%Y年%m月%d日')}后才能使用此道具"
         del death_cd[user_id]
 
-    @plugin.temp_handle(f"{user_id} {group_id}", extra_args=["user_id", "group_id"], timeout=60)
-    @Rule.locate(user_id, group_id)
+    @plugin.temp_handle(f"{user_id} {group_id}", extra_args=["user_id", "group_id"], timeout=60, rule=Rule.locate(user_id, group_id))
     async def _(event: Event, finish: Plugin.Finish):
         finish()
         command = event.raw_command
