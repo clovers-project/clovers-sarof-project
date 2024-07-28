@@ -91,7 +91,7 @@ async def _(event: Event):
 russian_roulette = Game("俄罗斯轮盘", "开枪")
 
 
-@plugin.handle(["俄罗斯轮盘"], ["user_id", "group_id", "at"])
+@plugin.handle(["俄罗斯轮盘", "装弹"], ["user_id", "group_id", "at"], priority=1)
 @russian_roulette.create(place)
 async def _(session: Session, arg: str):
     bullet_num = to_int(arg)
@@ -149,7 +149,7 @@ async def _(event: Event, session: Session):
 dice = Game("掷骰子", "开数")
 
 
-@plugin.handle(["摇色子", "摇骰子", "掷色子", "掷骰子"], ["user_id", "group_id", "at"])
+@plugin.handle(["摇色子", "摇骰子", "掷色子", "掷骰子"], ["user_id", "group_id", "at"], priority=1)
 @dice.create(place)
 async def _(session: Session, arg: str):
     def dice_pt(dice_array: list):
@@ -283,7 +283,7 @@ class PokerGame:
             return "\n".join(f"【{PokerGame.card(*card)}】" for i, card in enumerate(self.hand, 1))
 
 
-@plugin.handle(["扑克对战"], ["user_id", "group_id", "at"])
+@plugin.handle(["扑克对战"], ["user_id", "group_id", "at"], priority=1)
 @poker.create(place)
 async def _(session: Session, arg: str):
     poker_data = PokerGame()
@@ -432,7 +432,7 @@ async def _(event: Event, session: Session):
 cantrell = Game("梭哈", "看牌|开牌")
 
 
-@plugin.handle(["同花顺", "港式五张", "梭哈"], ["user_id", "group_id", "at"])
+@plugin.handle(["同花顺", "港式五张", "梭哈"], ["user_id", "group_id", "at"], priority=1)
 @cantrell.create(place)
 async def _(session: Session, arg: str):
     level = to_int(arg)
@@ -608,7 +608,7 @@ async def _(event: Event, session: Session):
 blackjack = Game("21点", "停牌|抽牌|双倍停牌")
 
 
-@plugin.handle(["21点", "黑杰克"], ["user_id", "group_id", "at"])
+@plugin.handle(["21点", "黑杰克"], ["user_id", "group_id", "at"], priority=1)
 @blackjack.create(place)
 async def _(session: Session, arg: str):
     deck = random_poker()
@@ -716,7 +716,7 @@ async def _(event: Event, session: Session):
 western_duel = Game("西部对战", "装弹|开枪|闪避|闪避开枪|预判开枪")
 
 
-@plugin.handle(["西部对战"], ["user_id", "group_id", "at"])
+@plugin.handle(["西部对战"], ["user_id", "group_id", "at"], priority=1)
 @western_duel.create(place)
 async def _(session: Session, arg: str):
     session.data["MAG1"] = 1
@@ -910,7 +910,7 @@ def buckshot_roulette_loading(session: Session):
     return f"本轮装弹：\n实弹:{real_bullet_num} 空弹:{empty_bullet_num}"
 
 
-@plugin.handle(["恶魔轮盘"], ["user_id", "group_id", "at"])
+@plugin.handle(["恶魔轮盘"], ["user_id", "group_id", "at"], priority=1)
 @buckshot_roulette.create(place)
 async def _(session: Session, arg: str):
     hp = to_int(arg)
@@ -1088,7 +1088,7 @@ from .horse_race import RaceWorld
 horse_race_game = Game("赛马小游戏", "赛马加入 名字")
 
 
-@plugin.handle(["赛马创建"], ["user_id", "group_id", "at"])
+@plugin.handle(["赛马创建"], ["user_id", "group_id", "at"], priority=1)
 @horse_race_game.create(place)
 async def _(session: Session, arg: str):
     session.at = session.p1_uid
