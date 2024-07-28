@@ -352,7 +352,7 @@ async def _(event: Event):
     user, account = manager.locate_account(event.at[0], group_id)
     confirm = "".join(str(random.randint(0, 9)) for _ in range(4))
 
-    @plugin.temp_handle(f"{confirm} {user_id} {group_id}", extra_args={"user_id", "group_id", "permission"})
+    @plugin.temp_handle(f"{confirm} {user_id} {group_id}", extra_args=["user_id", "group_id", "permission"])
     async def _(temp_event: Event, finish):
         if temp_event.user_id != user_id or temp_event.group_id != group_id:
             return

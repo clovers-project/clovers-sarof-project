@@ -3,7 +3,6 @@ import os
 import json
 from pathlib import Path
 from collections.abc import Callable, Coroutine
-from clovers.core.plugin import PluginError
 from clovers_leafgame.core.clovers import Event
 from clovers_leafgame.item import Prop, AIR
 from clovers_leafgame.main import plugin, manager
@@ -49,8 +48,7 @@ def gacha() -> str:
 def usage(prop_name: str, extra_args):
     def decorator(func: Callable[..., Coroutine]):
         prop = manager.props_library.get(prop_name)
-        if not prop:
-            raise PluginError(f"不存在道具{prop_name}，无法注册使用方法。")
+        assert prop is not None, f"不存在道具{prop_name}，无法注册使用方法。"
 
         @plugin.handle(f"使用(道具)?\\s*{prop_name}\\s*(\\d*)(.*)", extra_args)
         async def _(event: Event):

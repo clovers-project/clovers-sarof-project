@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from clovers.core.plugin import Event as CloversEvent, Plugin
 from clovers.utils.tools import to_int
 
@@ -125,8 +124,7 @@ class Rule:
         def decorator(func):
             async def wrapper(event: Event, finish: Plugin.Finish):
                 if event.user_id == user_id and event.group_id == group_id:
-                    return
-                return await func(event, finish)
+                    return await func(event, finish)
 
             return wrapper
 

@@ -10,7 +10,7 @@ from .tools import random_poker, poker_suit, poker_point, poker_show
 place: dict[str, Session] = {}
 
 
-@plugin.handle({"接受挑战"}, {"user_id", "group_id", "nickname"})
+@plugin.handle(["接受挑战"], ["user_id", "group_id", "nickname"])
 async def _(event: Event):
     group_id = event.group_id
     session = Game.session_check(place, group_id)
@@ -45,7 +45,7 @@ async def _(event: Event):
     return msg
 
 
-@plugin.handle({"拒绝挑战"}, {"user_id", "group_id"})
+@plugin.handle(["拒绝挑战"], ["user_id", "group_id"])
 async def _(event: Event):
     session = Game.session_check(place, event.group_id)
     if session and (at := session.at) and at == event.user_id:
@@ -54,14 +54,14 @@ async def _(event: Event):
         return "拒绝成功，对决已结束。"
 
 
-@plugin.handle({"超时结算"}, {"user_id", "group_id"})
+@plugin.handle(["超时结算"], ["user_id", "group_id"])
 async def _(event: Event):
     if (session := place.get(event.group_id)) and session.timeout() < 0:
         session.win = session.p2_uid if session.next == session.p1_uid else session.p1_uid
         return session.end()
 
 
-@plugin.handle({"认输"}, {"user_id", "group_id"})
+@plugin.handle(["认输"], ["user_id", "group_id"])
 async def _(event: Event):
     user_id = event.user_id
     session = place.get(event.group_id)
@@ -76,7 +76,7 @@ async def _(event: Event):
     return session.end()
 
 
-@plugin.handle({"游戏重置", "清除对战"}, {"user_id", "group_id", "permission"})
+@plugin.handle(["游戏重置", "清除对战"], ["user_id", "group_id", "permission"])
 async def _(event: Event):
     group_id = event.group_id
     session = place.get(group_id)
@@ -91,7 +91,7 @@ async def _(event: Event):
 russian_roulette = Game("俄罗斯轮盘", "开枪")
 
 
-@plugin.handle({"俄罗斯轮盘"}, {"user_id", "group_id", "at"})
+@plugin.handle(["俄罗斯轮盘"], ["user_id", "group_id", "at"])
 @russian_roulette.create(place)
 async def _(session: Session, arg: str):
     bullet_num = to_int(arg)
@@ -115,7 +115,7 @@ async def _(session: Session, arg: str):
     return f"{' '.join('咔' for _ in range(bullet_num))}，装填完毕{tip}\n{session.create_info()}"
 
 
-@plugin.handle({"开枪"}, {"user_id", "group_id"})
+@plugin.handle(["开枪"], ["user_id", "group_id"])
 @russian_roulette.action(place)
 async def _(event: Event, session: Session):
     bullet = session.data["bullet"]
@@ -149,7 +149,7 @@ async def _(event: Event, session: Session):
 dice = Game("掷骰子", "开数")
 
 
-@plugin.handle({"摇色子", "摇骰子", "掷色子", "掷骰子"}, {"user_id", "group_id", "at"})
+@plugin.handle(["摇色子", "摇骰子", "掷色子", "掷骰子"], ["user_id", "group_id", "at"])
 @dice.create(place)
 async def _(session: Session, arg: str):
     def dice_pt(dice_array: list):
@@ -212,7 +212,7 @@ async def _(session: Session, arg: str):
     return f"哗啦哗啦~，骰子准备完毕{tip}\n{session.create_info()}"
 
 
-@plugin.handle({"开数"}, {"user_id", "group_id"})
+@plugin.handle(["开数"], ["user_id", "group_id"])
 @dice.action(place)
 async def _(event: Event, session: Session):
     user_id = event.user_id
@@ -283,7 +283,7 @@ class PokerGame:
             return "\n".join(f"【{PokerGame.card(*card)}】" for i, card in enumerate(self.hand, 1))
 
 
-@plugin.handle({"扑克对战"}, {"user_id", "group_id", "at"})
+@plugin.handle(["扑克对战"], ["user_id", "group_id", "at"])
 @poker.create(place)
 async def _(session: Session, arg: str):
     poker_data = PokerGame()
@@ -298,7 +298,7 @@ async def _(session: Session, arg: str):
     return f"唰唰~，随机牌堆已生成{tip}\n{session.create_info()}"
 
 
-@plugin.handle({"出牌"}, {"user_id", "group_id"})
+@plugin.handle(["出牌"], ["user_id", "group_id"])
 @poker.action(place)
 async def _(event: Event, session: Session):
     if session.data["ACT"]:
@@ -432,7 +432,7 @@ async def _(event: Event, session: Session):
 cantrell = Game("梭哈", "看牌|开牌")
 
 
-@plugin.handle({"同花顺", "港式五张", "梭哈"}, {"user_id", "group_id", "at"})
+@plugin.handle(["同花顺", "港式五张", "梭哈"], ["user_id", "group_id", "at"])
 @cantrell.create(place)
 async def _(session: Session, arg: str):
     level = to_int(arg)
@@ -555,7 +555,7 @@ async def _(session: Session, arg: str):
     return f"唰唰~，随机牌堆已生成，等级：{level}{tip}\n{session.create_info()}"
 
 
-@plugin.handle({"看牌"}, {"user_id", "group_id"})
+@plugin.handle(["看牌"], ["user_id", "group_id"])
 @cantrell.action(place)
 async def _(event: Event, session: Session):
     if not event.is_private():
@@ -566,7 +566,7 @@ async def _(event: Event, session: Session):
     return f"{poker_show(hand[0:expose],'\n')}"
 
 
-@plugin.handle({"开牌"}, {"user_id", "group_id"})
+@plugin.handle(["开牌"], ["user_id", "group_id"])
 @cantrell.action(place)
 async def _(event: Event, session: Session):
     user_id = event.user_id
@@ -608,7 +608,7 @@ async def _(event: Event, session: Session):
 blackjack = Game("21点", "停牌|抽牌|双倍停牌")
 
 
-@plugin.handle({"21点", "黑杰克"}, {"user_id", "group_id", "at"})
+@plugin.handle(["21点", "黑杰克"], ["user_id", "group_id", "at"])
 @blackjack.create(place)
 async def _(session: Session, arg: str):
     deck = random_poker()
@@ -671,7 +671,7 @@ def blackjack_end(session: Session):
     return session.end(output)
 
 
-@plugin.handle({"抽牌"}, {"user_id", "group_id", "send_group_message"})
+@plugin.handle(["抽牌"], ["user_id", "group_id", "send_group_message"])
 @blackjack.action(place)
 async def _(event: Event, session: Session):
     hand, pt = blackjack_hit(session)
@@ -686,7 +686,7 @@ async def _(event: Event, session: Session):
     return msg
 
 
-@plugin.handle({"停牌"}, {"user_id", "group_id", "send_group_message"})
+@plugin.handle(["停牌"], ["user_id", "group_id", "send_group_message"])
 @blackjack.action(place)
 async def _(event: Event, session: Session):
     if session.round == 1:
@@ -697,7 +697,7 @@ async def _(event: Event, session: Session):
     await event.send_group_message(session.group_id, build_result(result))
 
 
-@plugin.handle({"双倍停牌"}, {"user_id", "group_id"})
+@plugin.handle(["双倍停牌"], ["user_id", "group_id"])
 @blackjack.action(place)
 async def _(event: Event, session: Session):
     session.double_bet()
@@ -716,7 +716,7 @@ async def _(event: Event, session: Session):
 western_duel = Game("西部对战", "装弹|开枪|闪避|闪避开枪|预判开枪")
 
 
-@plugin.handle({"西部对战"}, {"user_id", "group_id", "at"})
+@plugin.handle(["西部对战"], ["user_id", "group_id", "at"])
 @western_duel.create(place)
 async def _(session: Session, arg: str):
     session.data["MAG1"] = 1
@@ -740,7 +740,7 @@ def western_duel_action(event: Event, session: Session, card: str):
         return "MAG2", f"双方行动: {session.data['card']} - {card}"
 
 
-@plugin.handle({"装弹"}, {"user_id", "group_id", "send_group_message"})
+@plugin.handle(["装弹"], ["user_id", "group_id", "send_group_message"])
 @western_duel.action(place)
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "装弹")
@@ -762,7 +762,7 @@ async def _(event: Event, session: Session):
     return tip + "\n本轮平局。"
 
 
-@plugin.handle({"开枪"}, {"user_id", "group_id", "send_group_message"})
+@plugin.handle(["开枪"], ["user_id", "group_id", "send_group_message"])
 @western_duel.action(place)
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
@@ -788,7 +788,7 @@ async def _(event: Event, session: Session):
     return tip + "\n本轮平局。"
 
 
-@plugin.handle({"闪避"}, {"user_id", "group_id", "send_group_message"})
+@plugin.handle(["闪避"], ["user_id", "group_id", "send_group_message"])
 @western_duel.action(place)
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
@@ -808,7 +808,7 @@ async def _(event: Event, session: Session):
     return tip + "\n本轮平局。"
 
 
-@plugin.handle({"闪枪"}, {"user_id", "group_id", "send_group_message"})
+@plugin.handle(["闪枪"], ["user_id", "group_id", "send_group_message"])
 @western_duel.action(place)
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
@@ -834,7 +834,7 @@ async def _(event: Event, session: Session):
     return tip + "\n本轮平局。"
 
 
-@plugin.handle({"预判开枪"}, {"user_id", "group_id", "send_group_message"})
+@plugin.handle(["预判开枪"], ["user_id", "group_id", "send_group_message"])
 @western_duel.action(place)
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
@@ -910,7 +910,7 @@ def buckshot_roulette_loading(session: Session):
     return f"本轮装弹：\n实弹:{real_bullet_num} 空弹:{empty_bullet_num}"
 
 
-@plugin.handle({"恶魔轮盘"}, {"user_id", "group_id", "at"})
+@plugin.handle(["恶魔轮盘"], ["user_id", "group_id", "at"])
 @buckshot_roulette.create(place)
 async def _(session: Session, arg: str):
     hp = to_int(arg)
@@ -933,7 +933,7 @@ async def _(session: Session, arg: str):
     return f"【恶魔轮盘】游戏已创建。{tip}\n{session.create_info()}"
 
 
-@plugin.handle(r"向(自己|对方)开枪$", {"user_id", "group_id"})
+@plugin.handle(["向自己开枪", "向对方开枪"], ["user_id", "group_id"])
 @buckshot_roulette.action(place)
 async def _(event: Event, session: Session):
     user_id = event.user_id
@@ -948,8 +948,8 @@ async def _(event: Event, session: Session):
         hp_self = "HP2"
         hp_others = "HP1"
         buff = "buff2"
-    target = event.single_arg()
-    hp = hp_self if target == "自己" else hp_others
+    target = event.raw_command[1:3]
+    hp = hp_self if event.raw_command == "自己" else hp_others
 
     def remove_tag(buffs: set[str], tag: str):
         if tag in buffs:
@@ -986,7 +986,7 @@ async def _(event: Event, session: Session):
     return ["\n".join(result), buckshot_roulette_status(session)]
 
 
-@plugin.handle({"使用道具"}, {"user_id", "group_id"})
+@plugin.handle(["使用道具"], ["user_id", "group_id"])
 @buckshot_roulette.action(place)
 async def _(event: Event, session: Session):
     prop_key = event.single_arg()
@@ -1088,7 +1088,7 @@ from .horse_race import RaceWorld
 horse_race_game = Game("赛马小游戏", "赛马加入 名字")
 
 
-@plugin.handle({"赛马创建"}, {"user_id", "group_id", "at"})
+@plugin.handle(["赛马创建"], ["user_id", "group_id", "at"])
 @horse_race_game.create(place)
 async def _(session: Session, arg: str):
     session.at = session.p1_uid
@@ -1101,7 +1101,7 @@ async def _(session: Session, arg: str):
     return f"> 创建赛马比赛成功！{tip},\n> 输入 【赛马加入 名字】 即可加入赛马。"
 
 
-@plugin.handle({"赛马加入"}, {"user_id", "group_id", "nickname"})
+@plugin.handle(["赛马加入"], ["user_id", "group_id", "nickname"])
 async def _(event: Event):
     if not (session := horse_race_game.session_check(place, event.group_id)):
         return
@@ -1119,7 +1119,7 @@ async def _(event: Event):
     return world.join_horse(horsename, account.user_id, account.name)
 
 
-@plugin.handle({"赛马开始"}, {"user_id", "group_id", "Bot_Nickname"})
+@plugin.handle(["赛马开始"], ["user_id", "group_id", "Bot_Nickname"])
 async def _(event: Event):
     group_id = event.group_id
     if not (session := horse_race_game.session_check(place, group_id)):

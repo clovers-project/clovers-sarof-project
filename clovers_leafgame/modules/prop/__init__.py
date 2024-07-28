@@ -72,14 +72,14 @@ async def _(event: Event):
     return manager.info_card(info, user.id)
 
 
-@usage("金币", {"user_id", "group_id", "nickname"})
+@usage("金币", ["user_id", "group_id", "nickname"])
 async def _(prop: Prop, event: Event, count: int, extra: str):
     if n := prop.deal(prop.locate_bank(*manager.account(event)), -count):
         return f"使用失败，你还有{n}枚金币。"
     return f"你使用了{count}枚金币。"
 
 
-@usage("临时维护凭证", {"user_id", "group_id", "nickname"})
+@usage("临时维护凭证", ["user_id", "group_id", "nickname"])
 async def _(prop: Prop, event: Event, count: int, extra: str):
     bank = prop.locate_bank(*manager.account(event))
     if prop.deal(bank, -1):
@@ -92,7 +92,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         return str(e)
 
 
-@usage("测试金库", {"user_id", "group_id", "nickname"})
+@usage("测试金库", ["user_id", "group_id", "nickname"])
 async def _(prop: Prop, event: Event, count: int, extra: str):
     bank = prop.locate_bank(*manager.account(event))
     if prop.deal(bank, -1):
@@ -100,7 +100,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     return "你获得了10亿金币，100万钻石。祝你好运！"
 
 
-@usage("空气礼包", {"user_id", "group_id", "nickname"})
+@usage("空气礼包", ["user_id", "group_id", "nickname"])
 async def _(prop: Prop, event: Event, count: int, extra: str):
     user, account = manager.account(event)
     bank = prop.locate_bank(user, account)
@@ -111,7 +111,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     return ["你获得了", manager.info_card(bank_card(data), user.id)]
 
 
-@usage("随机红包", {"user_id", "group_id", "nickname"})
+@usage("随机红包", ["user_id", "group_id", "nickname"])
 async def _(prop: Prop, event: Event, count: int, extra: str):
     user, account = manager.account(event)
     bank = prop.locate_bank(user, account)
@@ -122,7 +122,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     return f"你获得了{gold}金币。祝你好运~"
 
 
-@usage("重开券", {"user_id", "group_id", "nickname"})
+@usage("重开券", ["user_id", "group_id", "nickname"])
 async def _(prop: Prop, event: Event, count: int, extra: str):
     user, account = manager.account(event)
     bank = prop.locate_bank(user, account)
@@ -137,7 +137,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     return ["你在本群的账户已重置，祝你好运~", manager.info_card([prop_card(data, "账户已重置")], user.id)]
 
 
-@usage("幸运硬币", {"user_id", "group_id", "nickname", "Bot_Nickname"})
+@usage("幸运硬币", ["user_id", "group_id", "nickname", "Bot_Nickname"])
 async def _(prop: Prop, event: Event, count: int, extra: str):
     user, account = manager.account(event)
     count = min(count, account.bank[GOLD.id])
@@ -157,7 +157,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         return f"你失去了{count}金币。\n{event.event.kwargs['Bot_Nickname']}送你1个『随机红包』，祝你好运~"
 
 
-@usage("超级幸运硬币", {"user_id", "group_id", "nickname", "Bot_Nickname"})
+@usage("超级幸运硬币", ["user_id", "group_id", "nickname", "Bot_Nickname"])
 async def _(prop: Prop, event: Event, count: int, extra: str):
     user, account = manager.account(event)
     bank = prop.locate_bank(user, account)
@@ -173,7 +173,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         return f"你失去了{gold}金币。\n{event.event.kwargs['Bot_Nickname']}送你1个『随机红包』，祝你好运~"
 
 
-@usage("道具兑换券", {"user_id", "group_id", "nickname"})
+@usage("道具兑换券", ["user_id", "group_id", "nickname"])
 async def _(prop: Prop, event: Event, count: int, extra: str):
     if extra:
         prop_name = extra.strip()
@@ -201,7 +201,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     return f"你获得了{count}个【{target_prop.name}】！（使用金币：{gold}）"
 
 
-@usage("绯红迷雾之书", {"user_id", "group_id", "nickname"})
+@usage("绯红迷雾之书", ["user_id", "group_id", "nickname"])
 async def _(prop: Prop, event: Event, count: int, extra: str):
     user_id = event.user_id
     bank = manager.data.user(user_id).bank
@@ -212,7 +212,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     tip = "请输入你要回档的日期:\n" + "\n".join(folders.keys())
     key = f"{user_id} {group_id}"
 
-    @plugin.temp_handle(key, extra_args={"user_id", "group_id"})
+    @plugin.temp_handle(key, extra_args=["user_id", "group_id"])
     @Rule.locate(user_id, group_id)
     async def _(event: Event, finish):
         date = event.raw_command
@@ -223,7 +223,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         tip2 = "请输入你要回档的时间:\n" + "\n".join(files.keys())
         finish()
 
-        @plugin.temp_handle(key, extra_args={"user_id", "group_id"})
+        @plugin.temp_handle(key, extra_args=["user_id", "group_id"])
         @Rule.locate(user_id, group_id)
         async def _(event: Event, finish):
             clock = event.raw_command
@@ -244,7 +244,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     return tip
 
 
-@usage("恶魔轮盘", {"user_id", "group_id", "nickname", "Bot_Nickname"})
+@usage("恶魔轮盘", ["user_id", "group_id", "nickname", "Bot_Nickname"])
 async def _(prop: Prop, event: Event, count: int, extra: str):
     user_id = event.user_id
     group_id = event.group_id
@@ -260,7 +260,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
             return f"您需要在{revival_date.strftime('%Y年%m月%d日')}后才能使用此道具"
         del death_cd[user_id]
 
-    @plugin.temp_handle(f"{user_id} {group_id}", extra_args={"user_id", "group_id"}, timeout=60)
+    @plugin.temp_handle(f"{user_id} {group_id}", extra_args=["user_id", "group_id"], timeout=60)
     @Rule.locate(user_id, group_id)
     async def _(event: Event, finish: Plugin.Finish):
         finish()
