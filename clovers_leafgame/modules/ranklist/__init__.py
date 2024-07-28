@@ -52,7 +52,7 @@ def group_ranklist(title: str, group_id: str):
     return ranklist
 
 
-@plugin.handle(r"^(.+)排行(.*)", {"user_id", "group_id", "to_me"})
+@plugin.handle(r"^(.+)排行(.*)", ["user_id", "group_id", "to_me"])
 async def _(event: Event):
     title = event.args[0]
     if title.startswith("路灯挂件"):

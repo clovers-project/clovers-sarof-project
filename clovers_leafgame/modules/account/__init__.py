@@ -4,7 +4,7 @@ from datetime import datetime
 from PIL import ImageColor
 from collections import Counter
 from clovers.utils.tools import download_url, format_number
-from clovers_leafgame.core.clovers import Event, Check
+from clovers_leafgame.core.clovers import Event, Rule
 from clovers_leafgame.main import plugin, manager
 from clovers_leafgame.item import (
     GOLD,
@@ -38,8 +38,7 @@ revolution_marking = config_data.revolution_marking
 debug_marking = config_data.debug_marking
 
 
-@plugin.handle({"设置背景"}, {"user_id", "to_me", "image_list"})
-@Check().to_me().check
+@plugin.handle(["设置背景"], ["user_id", "to_me", "image_list"], rule=Rule.to_me)
 async def _(event: Event):
     user_id = event.user_id
     user = manager.data.user(user_id)
@@ -76,14 +75,13 @@ async def _(event: Event):
         return "\n".join(log)
 
 
-@plugin.handle({"删除背景"}, {"user_id", "to_me"})
-@Check().to_me().check
+@plugin.handle(["删除背景"], ["user_id", "to_me"], rule=Rule.to_me)
 async def _(event: Event):
     Path.unlink(manager.BG_PATH / f"{event.user_id}.png", True)
     return "背景图片删除成功！"
 
 
-@plugin.handle({"金币签到", "轮盘签到"}, {"user_id", "group_id", "nickname", "avatar"})
+@plugin.handle(["金币签到", "轮盘签到"], ["user_id", "group_id", "nickname", "avatar"])
 async def _(event: Event):
     user, account = manager.account(event)
     if avatar := event.avatar:
@@ -97,8 +95,7 @@ async def _(event: Event):
     return random.choice(["祝你好运~", "可别花光了哦~"]) + f"\n你获得了 {n} 金币"
 
 
-@plugin.handle({"发红包"}, {"user_id", "group_id", "at", "permission"})
-@Check().at().check
+@plugin.handle(["发红包"], ["user_id", "group_id", "at", "permission"], rule=Rule.at)
 async def _(event: Event):
     unsettled = event.args_to_int()
     sender_id = event.user_id
@@ -111,8 +108,7 @@ async def _(event: Event):
     return manager.transfer(GOLD, unsettled, sender_id, receiver_id, event.group_id)
 
 
-@plugin.handle({"送道具"}, {"user_id", "group_id", "at", "permission"})
-@Check().at().check
+@plugin.handle(["送道具"], ["user_id", "group_id", "at", "permission"], rule=Rule.at)
 async def _(event: Event):
     if not (args := event.args_parse()):
         return
@@ -130,7 +126,7 @@ async def _(event: Event):
     return manager.transfer(prop, unsettled, sender_id, receiver_id, event.group_id)
 
 
-@plugin.handle(r"(.+)查询$", {"user_id", "group_id"})
+@plugin.handle(r"(.+)查询$", ["user_id", "group_id"])
 async def _(event: Event):
     prop = manager.props_library.get(event.args[0])
     if not prop:
@@ -157,7 +153,7 @@ async def _(event: Event):
     return f"你还有 {account.bank[prop.id]} 个{prop.name}"
 
 
-@plugin.handle({"我的信息", "我的资料卡"}, {"user_id", "group_id", "nickname"})
+@plugin.handle(["我的信息", "我的资料卡"], ["user_id", "group_id", "nickname"])
 async def _(event: Event):
     user, account = manager.account(event)
     info = []
@@ -212,7 +208,7 @@ async def _(event: Event):
     return manager.info_card(info, event.user_id)
 
 
-@plugin.handle({"我的道具"}, {"user_id", "group_id", "nickname"})
+@plugin.handle(["我的道具"], ["user_id", "group_id", "nickname"])
 async def _(event: Event):
     user, account = manager.account(event)
     props = Counter()
@@ -229,7 +225,7 @@ async def _(event: Event):
     return manager.info_card(info, event.user_id)
 
 
-@plugin.handle({"股票查询", "投资查询"}, {"user_id", "group_id", "nickname"})
+@plugin.handle(["股票查询", "投资查询"], ["user_id", "group_id", "nickname"])
 async def _(event: Event):
     user, account = manager.account(event)
     data = manager.invest_data(user.invest)
@@ -238,7 +234,7 @@ async def _(event: Event):
     return "您的仓库空空如也。"
 
 
-@plugin.handle({"群金库"}, {"user_id", "group_id", "permission"})
+@plugin.handle(["群金库"], ["user_id", "group_id", "permission"])
 async def _(event: Event):
     if event.is_private() or not (args := event.args_parse()):
         return
@@ -293,7 +289,7 @@ async def _(event: Event):
     return f"{sender}向{receiver}转移了{n}个{item.name}"
 
 
-@plugin.handle({"群资料卡"}, {"user_id", "group_id", "nickname"})
+@plugin.handle(["群资料卡"], ["user_id", "group_id", "nickname"])
 async def _(event: Event):
     """
     群资料卡
@@ -336,8 +332,7 @@ async def _(event: Event):
 
 
 # 超管指令
-@plugin.handle({"获取"}, {"user_id", "group_id", "nickname", "permission"})
-@Check().superuser().check
+@plugin.handle(["获取"], ["user_id", "group_id", "nickname", "permission"], rule=Rule.superuser)
 async def _(event: Event):
     if not (args := event.args_parse()):
         return
@@ -350,8 +345,7 @@ async def _(event: Event):
     return f"你获得了{N}个【{prop.name}】！"
 
 
-@plugin.handle({"冻结资产"}, {"user_id", "group_id", "permission", "at"})
-@Check().superuser().at().check
+@plugin.handle(["冻结资产"], ["user_id", "group_id", "permission", "at"], rule=[Rule.superuser, Rule.at])
 async def _(event: Event):
     user_id = event.user_id
     group_id = event.group_id

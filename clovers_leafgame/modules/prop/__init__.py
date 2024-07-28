@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timedelta
 from collections import Counter
 from clovers.core.plugin import Plugin
-from clovers_leafgame.core.clovers import Event, Check
+from clovers_leafgame.core.clovers import Event, Rule
 from clovers_leafgame.main import plugin, manager
 from clovers_leafgame.item import Prop, GOLD, STD_GOLD
 from .core import usage, gacha, AIR_PACK, RED_PACKET
@@ -24,8 +24,11 @@ luckey_min, luckey_max = config_data.luckey_coin
 ticket_price = gacha_gold * 50
 
 
-@plugin.handle(r"^(.+)连抽?卡?|单抽", {"user_id", "group_id", "nickname", "to_me"})
-@Check().to_me().check
+@plugin.handle(
+    r"^(.+)连抽?卡?|单抽",
+    ["user_id", "group_id", "nickname", "to_me"],
+    rule=Rule.to_me,
+)
 async def _(event: Event):
     count = event.args_to_int()
     if not count:
@@ -210,7 +213,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     key = f"{user_id} {group_id}"
 
     @plugin.temp_handle(key, extra_args={"user_id", "group_id"})
-    @Check().locate(user_id, group_id).check
+    @Rule.locate(user_id, group_id)
     async def _(event: Event, finish):
         date = event.raw_command
         folder = folders.get(date)
@@ -221,7 +224,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         finish()
 
         @plugin.temp_handle(key, extra_args={"user_id", "group_id"})
-        @Check().locate(user_id, group_id).check
+        @Rule.locate(user_id, group_id)
         async def _(event: Event, finish):
             clock = event.raw_command
             file = files.get(clock)
@@ -258,9 +261,8 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         del death_cd[user_id]
 
     @plugin.temp_handle(f"{user_id} {group_id}", extra_args={"user_id", "group_id"}, timeout=60)
+    @Rule.locate(user_id, group_id)
     async def _(event: Event, finish: Plugin.Finish):
-        if event.user_id != user_id or event.group_id != group_id:
-            return
         finish()
         command = event.raw_command
         if command == "取消":

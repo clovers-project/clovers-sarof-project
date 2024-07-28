@@ -1,7 +1,7 @@
 from datetime import datetime
 from collections import Counter
 from clovers_apscheduler import scheduler
-from clovers_leafgame.core.clovers import Event, Check
+from clovers_leafgame.core.clovers import Event, Rule
 from clovers_leafgame.main import plugin, manager
 
 
@@ -49,25 +49,22 @@ def verification():
 
 
 # 数据验证
-@plugin.handle({"数据验证"}, {"permission"})
-@Check().superuser().check
+@plugin.handle(["数据验证"], ["permission"], rule=Rule.superuser)
 async def _(event: Event):
     verification()
     print("数据已验证")
 
 
-@plugin.handle({"保存游戏"}, {"permission"})
-@Check().superuser().check
+@plugin.handle(["保存游戏"], ["permission"], rule=Rule.superuser)
 @scheduler.scheduled_job("cron", minute="*/10", misfire_grace_time=120)
-async def _():
+async def _(*arg, **kwargs):
     manager.save()
     print("游戏数据已保存！")
 
 
-@plugin.handle({"刷新每日"}, {"permission"})
-@Check().superuser().check
+@plugin.handle(["刷新每日"], ["permission"], rule=Rule.superuser)
 @scheduler.scheduled_job("cron", hour=0, misfire_grace_time=120)
-async def _():
+async def _(*arg, **kwargs):
     revolution_today = datetime.today().weekday() in {4, 5, 6}
     for user in manager.data.user_dict.values():
         bank = {k: (v - 1) if prop.flow == 0 else v for k, v in user.bank.items() if (prop := manager.props_library.get(k))}
@@ -83,9 +80,8 @@ async def _():
 
 
 # 数据备份
-@plugin.handle({"数据备份"}, {"permission"})
-@Check().superuser().check
+@plugin.handle(["数据备份"], ["permission"], rule=Rule.superuser)
 @scheduler.scheduled_job("cron", hour="*/4", misfire_grace_time=120)
-async def _():
+async def _(*arg, **kwargs):
     manager.backup()
     print(manager.clean_backup(604800))

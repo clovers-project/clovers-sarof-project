@@ -6,7 +6,7 @@ from io import BytesIO
 from collections import Counter
 from clovers_apscheduler import scheduler
 from clovers.utils.tools import gini_coef, format_number
-from clovers_leafgame.core.clovers import Event, Check
+from clovers_leafgame.core.clovers import Event, Rule
 from clovers_leafgame.core.data import Account, Group, Stock
 from clovers_leafgame.main import plugin, manager
 from clovers_leafgame.item import GOLD, LICENSE, STD_GOLD, REVOLUTION_MARKING, item_name_rule
@@ -26,7 +26,7 @@ revolt_cd = config_data.revolt_cd
 company_public_gold = config_data.company_public_gold
 
 
-@plugin.handle({"发起重置"}, {"group_id"})
+@plugin.handle(["发起重置"], ["group_id"])
 async def _(event: Event):
     group_id = event.group_id
     group = manager.data.group(group_id)
@@ -65,7 +65,7 @@ async def _(event: Event):
     return f"当前系数为：{round(gini,3)}，重置成功！恭喜{top.name}进入挂件榜☆！重置签到已刷新。"
 
 
-@plugin.handle({"重置签到", "领取金币"}, {"user_id", "group_id", "nickname", "avatar"})
+@plugin.handle(["重置签到", "领取金币"], ["user_id", "group_id", "nickname", "avatar"])
 async def _(event: Event):
     user, account = manager.account(event)
     if avatar := event.avatar:
@@ -79,7 +79,7 @@ async def _(event: Event):
     return f"这是你重置后获得的金币！你获得了 {n} 金币"
 
 
-@plugin.handle({"金币转入"}, {"user_id", "group_id", "nickname"})
+@plugin.handle(["金币转入"], ["user_id", "group_id", "nickname"])
 async def _(event: Event):
     n = event.args_to_int()
     if n == 0:
@@ -108,7 +108,7 @@ async def _(event: Event):
         return f"你成功将{n_out}枚金币兑换为{n_in}枚标准金币"
 
 
-@plugin.handle({"金币转移"}, {"user_id", "group_id"})
+@plugin.handle(["金币转移"], ["user_id", "group_id"])
 async def _(event: Event):
     if not (args := event.args_parse()):
         return
@@ -142,8 +142,11 @@ async def _(event: Event):
     return f"{group_out.nickname}向{group_in.nickname}转移{xfer} 金币\n汇率 {round(ExRate,2)}\n实际到账金额 {receipt}"
 
 
-@plugin.handle({"市场注册", "公司注册", "注册公司"}, {"group_id", "to_me", "permission", "group_avatar"})
-@Check().to_me().group_admin().check
+@plugin.handle(
+    ["市场注册", "公司注册", "注册公司"],
+    ["group_id", "to_me", "permission", "group_avatar"],
+    rule=[Rule.to_me, Rule.group_admin],
+)
 async def _(event: Event):
     group_id = event.group_id
     group = manager.data.group(group_id)
@@ -182,8 +185,11 @@ async def _(event: Event):
     return f"{stock.name}发行成功，发行价格为{format_number(stock.value/ 20000)}金币"
 
 
-@plugin.handle({"公司重命名"}, {"group_id", "to_me", "permission"})
-@Check().to_me().group_admin().check
+@plugin.handle(
+    ["公司重命名"],
+    ["group_id", "to_me", "permission"],
+    rule=[Rule.to_me, Rule.group_admin],
+)
 async def _(event: Event):
     group = manager.data.group(event.group_id)
     stock = group.stock
@@ -202,7 +208,7 @@ async def _(event: Event):
     return f"【{old_name}】已重命名为【{stock_name}】"
 
 
-@plugin.handle({"购买", "发行购买"}, {"user_id", "group_id", "nickname"})
+@plugin.handle(["购买", "发行购买"], ["user_id", "group_id", "nickname"])
 async def _(event: Event):
     if not (args := event.args_parse()):
         return
@@ -263,7 +269,7 @@ async def _(event: Event):
     return output
 
 
-@plugin.handle({"出售", "卖出", "结算"}, {"user_id"})
+@plugin.handle(["出售", "卖出", "结算"], ["user_id"])
 async def _(event: Event):
     if not (args := event.args_parse()):
         return
@@ -296,7 +302,7 @@ async def _(event: Event):
     return output
 
 
-@plugin.handle({"市场信息"}, {"user_id"})
+@plugin.handle(["市场信息"], ["user_id"])
 async def _(event: Event):
     data = [(stock, group.invest[stock.id]) for group in manager.data.group_dict.values() if (stock := group.stock)]
     if not data:
@@ -305,8 +311,11 @@ async def _(event: Event):
     return manager.info_card([invest_card(data)], event.user_id)
 
 
-@plugin.handle({"继承公司账户", "继承群账户"}, {"user_id", "permission"})
-@Check().superuser().check
+@plugin.handle(
+    ["继承公司账户", "继承群账户"],
+    ["user_id", "permission"],
+    rule=Rule.superuser,
+)
 async def _(event: Event):
     args = event.args
     if len(args) != 3:
@@ -356,8 +365,7 @@ async def _(event: Event):
     return manager.info_card(info, event.user_id)
 
 
-@plugin.handle({"刷新市场"}, {"permission"})
-@Check().superuser().check
+@plugin.handle(["刷新市场"], ["permission"], rule=Rule.superuser)
 @scheduler.scheduled_job("cron", minute="*/5", misfire_grace_time=120)
 async def _():
     def stock_update(group: Group):

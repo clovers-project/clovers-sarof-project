@@ -1,5 +1,5 @@
-from collections.abc import Callable, Coroutine
-from clovers.core.plugin import Event as CloversEvent
+from collections.abc import Callable
+from clovers.core.plugin import Event as CloversEvent, Plugin
 from clovers.utils.tools import to_int
 
 
@@ -99,53 +99,35 @@ class Event:
             print(e)
 
 
-class Check:
-    checker: list[Callable[[Event], bool]]
+class Rule:
+    @staticmethod
+    def superuser(event: Event):
+        return event.permission > 2
 
-    def __init__(self) -> None:
-        self.checker = []
+    @staticmethod
+    def group_owner(event: Event):
+        return event.permission > 1
 
-    def superuser(self):
-        self.checker.append(lambda event: event.permission > 2)
-        return self
+    @staticmethod
+    def group_admin(event: Event):
+        return event.permission > 0
 
-    def group_owner(self):
-        self.checker.append(lambda event: event.permission > 1)
-        return self
+    @staticmethod
+    def to_me(event: Event):
+        return event.to_me
 
-    def group_admin(self):
-        self.checker.append(lambda event: event.permission > 0)
-        return self
+    @staticmethod
+    def at(event: Event):
+        return bool(event.at)
 
-    def locate(self, user_id, group_id):
-        self.checker.append(lambda event: event.user_id == user_id and event.group_id == group_id)
-        return self
-
-    def to_me(self):
-        self.checker.append(lambda event: event.to_me)
-        return self
-
-    def at(self):
-        self.checker.append(lambda event: bool(event.at))
-        return self
-
-    def check(self, func: Callable[..., Coroutine]) -> Callable[..., Coroutine]:
-        if len(self.checker) == 1:
-            checker = self.checker[0]
-        else:
-            checker = lambda event: any(checker(event) for checker in self.checker)
-
-        if "event" in func.__code__.co_varnames:
-
-            async def wrapper(event: Event, *args, **kwargs):
-                if checker(event):
-                    return await func(event, *args, **kwargs)
+    @staticmethod
+    def locate(user_id: str, group_id: str):
+        def decorator(func):
+            async def wrapper(event: Event, finish: Plugin.Finish):
+                if event.user_id == user_id and event.group_id == group_id:
+                    return
+                return await func(event, finish)
 
             return wrapper
-        else:
 
-            async def wrapper(event: Event, *args, **kwargs):
-                if checker(event):
-                    return await func(*args, **kwargs)
-
-            return wrapper
+        return decorator
