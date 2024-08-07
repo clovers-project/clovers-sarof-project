@@ -1,13 +1,16 @@
-import matplotlib.pyplot as plt
-import mplfinance as mpf
-import pandas as pd
-import numpy as np
 from datetime import datetime
 from io import BytesIO
 from PIL import Image, ImageDraw
-from .core.data import Prop, Stock
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
+import mplfinance as mpf
+
+
 from clovers.utils.linecard import FontManager, linecard
 from clovers.utils.tools import format_number
+from .core.data import Prop, Stock
 from .main import config_data
 
 fontname = config_data.fontname
@@ -15,8 +18,8 @@ fallback = config_data.fallback_fonts
 
 font_manager = FontManager(fontname, fallback, (30, 40, 60))
 
-plt.rcParams["font.family"] = fontname
-plt.rcParams["font.sans-serif"] = fallback
+plt.rcParams["font.family"] = FontProperties(fname=font_manager.path).get_name()
+plt.rcParams["font.sans-serif"] = [FontProperties(fname=path).get_name() for path in font_manager.fallback_paths]
 
 
 def text_to_image(text: str, font_size=40, width=880, **kwargs):
