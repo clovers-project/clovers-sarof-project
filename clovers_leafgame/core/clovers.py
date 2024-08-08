@@ -25,7 +25,7 @@ class Event:
 
     @property
     def nickname(self) -> str:
-        return self.event.kwargs["nickname"]
+        return self.event.kwargs["nickname"].replace("\n", "").replace(" ", "")
 
     @property
     def permission(self) -> int:

@@ -5,6 +5,7 @@ import random
 from io import BytesIO
 from collections import Counter
 from clovers_apscheduler import scheduler
+from clovers.core.logger import logger
 from clovers.utils.tools import gini_coef, format_number
 from clovers_leafgame.core.clovers import Event, Rule
 from clovers_leafgame.core.data import Account, Group, Stock
@@ -185,11 +186,7 @@ async def _(event: Event):
     return f"{stock.name}发行成功，发行价格为{format_number(stock.value/ 20000)}金币"
 
 
-@plugin.handle(
-    ["公司重命名"],
-    ["group_id", "to_me", "permission"],
-    rule=[Rule.to_me, Rule.group_admin],
-)
+@plugin.handle(["公司重命名"], ["group_id", "to_me", "permission"], rule=[Rule.to_me, Rule.group_admin])
 async def _(event: Event):
     group = manager.data.group(event.group_id)
     stock = group.stock
@@ -311,11 +308,7 @@ async def _(event: Event):
     return manager.info_card([invest_card(data)], event.user_id)
 
 
-@plugin.handle(
-    ["继承公司账户", "继承群账户"],
-    ["user_id", "permission"],
-    rule=Rule.superuser,
-)
+@plugin.handle(["继承公司账户", "继承群账户"], ["user_id", "permission"], rule=Rule.superuser)
 async def _(event: Event):
     args = event.args
     if len(args) != 3:
@@ -367,11 +360,12 @@ async def _(event: Event):
 
 @plugin.handle(["刷新市场"], ["permission"], rule=Rule.superuser)
 @scheduler.scheduled_job("cron", minute="*/5", misfire_grace_time=120)
-async def _():
+async def _(*arg, **kwargs):
     def stock_update(group: Group):
         stock = group.stock
         if not stock:
-            return f"{group.id} 更新失败"
+            logger.info(f"{group.id} 更新失败")
+            return
         level = group.level
         # 资产更新
         wealths = manager.group_wealths(group.id, GOLD.id)
@@ -379,7 +373,8 @@ async def _():
         floating = stock.floating
         if not floating or math.isnan(floating):
             stock.floating = float(stock_value)
-            return f"{stock.name} 已初始化"
+            logger.info(f"{stock.name} 已初始化")
+            return
         # 股票价格变化：趋势性影响（正态分布），随机性影响（平均分布），向债务价值回归
         floating += floating * random.gauss(0, 0.03)
         floating += stock_value * random.uniform(-0.1, 0.1)
@@ -434,7 +429,20 @@ async def _():
         stock_record.append((now_time, floating / issuance))
         stock_record = stock_record[-720:]
         group.extra["stock_record"] = stock_record
-        return f"{stock.name} 更新成功！"
+        logger.info(f"{stock.name} 更新成功！")
 
     groups = (group for group in manager.data.group_dict.values() if group.stock and group.stock.issuance)
-    print("\n".join(stock_update(group) for group in groups))
+    for group in groups:
+        stock_update(group)
+
+
+@plugin.handle(["市场浮动重置"], ["permission"], rule=Rule.superuser)
+async def _():
+    groups = (group for group in manager.data.group_dict.values() if group.stock and group.stock.issuance)
+    for group in groups:
+        stock = group.stock
+        if not stock:
+            continue
+        wealths = manager.group_wealths(group.id, GOLD.id)
+        stock_value = stock.value = sum(wealths) * group.level + group.bank[STD_GOLD.id]
+        stock.floating = stock.value = stock_value
