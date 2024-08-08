@@ -437,7 +437,7 @@ async def _(*arg, **kwargs):
 
 
 @plugin.handle(["市场浮动重置"], ["permission"], rule=Rule.superuser)
-async def _():
+async def _(event: Event):
     groups = (group for group in manager.data.group_dict.values() if group.stock and group.stock.issuance)
     for group in groups:
         stock = group.stock
@@ -446,3 +446,4 @@ async def _():
         wealths = manager.group_wealths(group.id, GOLD.id)
         stock_value = stock.value = sum(wealths) * group.level + group.bank[STD_GOLD.id]
         stock.floating = stock.value = stock_value
+    return "重置成功！"
