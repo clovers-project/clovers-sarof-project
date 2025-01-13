@@ -7,9 +7,8 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import mplfinance as mpf
 
-
-from clovers.utils.linecard import FontManager, linecard
-from clovers.utils.tools import format_number
+from clovers_utils.linecard import FontManager, linecard
+from clovers_utils.tools import format_number
 from .core.data import Prop, Stock
 from .main import config_data
 

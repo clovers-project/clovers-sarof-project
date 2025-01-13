@@ -2,7 +2,7 @@ import random
 import asyncio
 from collections import Counter
 from clovers_leafgame.main import plugin, manager, build_result
-from clovers_leafgame.core.clovers import Event
+from clovers_leafgame.core.clovers import Event, Result
 from clovers_leafgame.output import text_to_image, BytesIO
 from .core import Session, Game, to_int
 from .tools import random_poker, poker_suit, poker_point, poker_show
@@ -631,7 +631,7 @@ def blackjack_pt(hand: list[tuple[int, int]]) -> int:
     """
     返回21点牌组点数。
     """
-    pts = [point if point < 10 else 10 for suip, point in hand]
+    pts = [point if point < 10 else 10 for _, point in hand]
     pt = sum(pts)
     if 1 in pts and pt <= 11:
         pt += 10
@@ -659,7 +659,12 @@ def blackjack_end(session: Session):
     pt1 = blackjack_pt(hand1)
     hand2 = session.data["hand2"]
     pt2 = blackjack_pt(hand2)
-    session.win = session.p1_uid if pt1 > pt2 else session.p2_uid
+    if pt1 > 21:
+        session.win = session.p2_uid
+    elif pt2 > 21:
+        session.win = session.p1_uid
+    else:
+        session.win = session.p1_uid if pt1 > pt2 else session.p2_uid
     output = BytesIO()
     result1 = f"玩家：{session.p1_nickname}\n手牌：{poker_show(hand1, '')}\n合计:{pt1}点"
     result2 = f"玩家：{session.p2_nickname}\n手牌：{poker_show(hand2, '')}\n合计:{pt2}点"
@@ -671,30 +676,46 @@ def blackjack_end(session: Session):
     return session.end(output)
 
 
-@plugin.handle(["抽牌"], ["user_id", "group_id", "send_group_message"])
+@plugin.handle(["抽牌"], ["user_id", "group_id", "nickname"])
 @blackjack.action(place)
 async def _(event: Event, session: Session):
     hand, pt = blackjack_hit(session)
-    msg = f"你的手牌：\n{poker_show(hand,'\n')}\n合计:{pt}点"
     if pt > 21:
-        await event.send_group_message(
-            session.group_id,
-            build_result(session.end(msg)),
-        )
-    if not event.is_private():
-        msg = "请在私信抽牌\n" + msg
-    return msg
+        result = blackjack_end(session)
+        if event.is_private():
+            await event.send_group_message(session.group_id, result)
+            return "请返回群内查看结果"
+        else:
+            return result
+    else:
+        msg = f"你的手牌：\n{poker_show(hand,'\n')}\n合计:{pt}点"
+        if event.is_private():
+            await event.send_group_message(session.group_id, f"{event.nickname} 已抽牌")
+            return msg
+        else:
+            user_id = event.user_id
+            await event.send_private_message(user_id, msg)
+            return [Result("at", user_id), "你的手牌已发送，请查看"]
 
 
-@plugin.handle(["停牌"], ["user_id", "group_id", "send_group_message"])
+@plugin.handle(["停牌"], ["user_id", "group_id"])
 @blackjack.action(place)
 async def _(event: Event, session: Session):
     if session.round == 1:
         session.nextround()
-        result = f"请{session.p2_nickname}抽牌|停牌|双倍停牌"
+        result = [Result("at", session.p2_uid), f"请{session.p2_nickname}{blackjack.action_tip}"]
+        if event.is_private():
+            await event.send_group_message(session.group_id, result)
+            return "你已停牌，请等待对方操作"
+        else:
+            return result
     else:
         result = blackjack_end(session)
-    await event.send_group_message(session.group_id, build_result(result))
+        if event.is_private():
+            await event.send_group_message(session.group_id, result)
+            return "请返回群内查看结果"
+        else:
+            return result
 
 
 @plugin.handle(["双倍停牌"], ["user_id", "group_id"])
@@ -702,15 +723,32 @@ async def _(event: Event, session: Session):
 async def _(event: Event, session: Session):
     session.double_bet()
     hand, pt = blackjack_hit(session)
-    if session.round > 1:
-        return blackjack_end(session)
-    session.nextround()
     msg = f"你的手牌：\n{poker_show(hand,'\n')}\n合计:{pt}点"
-    if pt > 21:
-        await event.send_group_message(session.group_id, build_result(session.end(msg)))
+    if session.round == 1:
+        if pt > 21:
+            result = blackjack_end(session)
+            if event.is_private():
+                await event.send_group_message(session.group_id, result)
+                return "请返回群内查看结果"
+            else:
+                return result
+        else:
+            session.nextround()
+            msg = f"你的手牌：\n{poker_show(hand,'\n')}\n合计:{pt}点"
+            result = [Result("at", session.p2_uid), f"请{session.p2_nickname}{blackjack.action_tip}"]
+            if event.is_private():
+                await event.send_group_message(session.group_id, result)
+                return msg
+            else:
+                await event.send_private_message(event.user_id, msg)
+                return result
     else:
-        await event.send_group_message(session.group_id, build_result(f"请{session.p2_nickname}{blackjack.action_tip}"))
-        return msg
+        result = blackjack_end(session)
+        if event.is_private():
+            await event.send_group_message(session.group_id, result)
+            return "请返回群内查看结果"
+        else:
+            return result
 
 
 western_duel = Game("西部对战", "装弹|开枪|闪避|闪避开枪|预判开枪")
@@ -740,7 +778,7 @@ def western_duel_action(event: Event, session: Session, card: str):
         return "MAG2", f"双方行动: {session.data['card']} - {card}"
 
 
-@plugin.handle(["装弹"], ["user_id", "group_id", "send_group_message"])
+@plugin.handle(["装弹"], ["user_id", "group_id"])
 @western_duel.action(place)
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "装弹")
@@ -751,18 +789,23 @@ async def _(event: Event, session: Session):
     session.data[MAG] = min(session.data[MAG], 6)
     card = session.data["card"]
     if event.user_id == session.p1_uid:
-        await event.send_group_message(
-            session.group_id,
-            build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
-        )
+        await event.send_group_message(session.group_id, f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。")
         return tip
+
     if card in {"开枪", "闪枪"}:
         session.win = session.p1_uid
-        return session.end(tip)
-    return tip + "\n本轮平局。"
+        result = session.end(tip)
+    else:
+        result = tip + "\n本轮平局。"
+
+    if event.is_private():
+        await event.send_group_message(session.group_id, result)
+        return "请返回群内查看结果"
+    else:
+        return result
 
 
-@plugin.handle(["开枪"], ["user_id", "group_id", "send_group_message"])
+@plugin.handle(["开枪"], ["user_id", "group_id"])
 @western_duel.action(place)
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
@@ -774,21 +817,26 @@ async def _(event: Event, session: Session):
     session.data[MAG] -= 1
     card = session.data["card"]
     if event.user_id == session.p1_uid:
-        await event.send_group_message(
-            session.group_id,
-            build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
-        )
+        await event.send_group_message(session.group_id, f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。")
         return tip
+
     if card == "闪枪":
         session.win = session.p1_uid
-        return session.end(tip)
-    if card in {"装弹", "预判开枪"}:
+        result = session.end(tip)
+    elif card in {"装弹", "预判开枪"}:
         session.win = session.p2_uid
-        return session.end(tip)
-    return tip + "\n本轮平局。"
+        result = session.end(tip)
+    else:
+        result = tip + "\n本轮平局。"
+
+    if event.is_private():
+        await event.send_group_message(session.group_id, result)
+        return "请返回群内查看结果"
+    else:
+        return result
 
 
-@plugin.handle(["闪避"], ["user_id", "group_id", "send_group_message"])
+@plugin.handle(["闪避"], ["user_id", "group_id"])
 @western_duel.action(place)
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
@@ -797,18 +845,23 @@ async def _(event: Event, session: Session):
     session.nextround()
     card = session.data["card"]
     if event.user_id == session.p1_uid:
-        await event.send_group_message(
-            session.group_id,
-            build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
-        )
+        await event.send_group_message(session.group_id, f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。")
         return tip
+
     if card == "预判开枪":
         session.win = session.p1_uid
-        return session.end(tip)
-    return tip + "\n本轮平局。"
+        result = session.end(tip)
+    else:
+        result = tip + "\n本轮平局。"
+
+    if event.is_private():
+        await event.send_group_message(session.group_id, result)
+        return "请返回群内查看结果"
+    else:
+        return result
 
 
-@plugin.handle(["闪枪"], ["user_id", "group_id", "send_group_message"])
+@plugin.handle(["闪枪"], ["user_id", "group_id"])
 @western_duel.action(place)
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
@@ -820,21 +873,26 @@ async def _(event: Event, session: Session):
     session.data[MAG] -= 1
     card = session.data["card"]
     if event.user_id == session.p1_uid:
-        await event.send_group_message(
-            session.group_id,
-            build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
-        )
+        await event.send_group_message(session.group_id, f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。")
         return tip
+
     if card == "预判开枪":
         session.win = session.p1_uid
-        return session.end(tip)
-    if card in {"装弹", "开枪"}:
+        result = session.end(tip)
+    elif card in {"装弹", "开枪"}:
         session.win = session.p2_uid
-        return session.end(tip)
-    return tip + "\n本轮平局。"
+        result = session.end(tip)
+    else:
+        result = tip + "\n本轮平局。"
+
+    if event.is_private():
+        await event.send_group_message(session.group_id, result)
+        return "请返回群内查看结果"
+    else:
+        return result
 
 
-@plugin.handle(["预判开枪"], ["user_id", "group_id", "send_group_message"])
+@plugin.handle(["预判开枪"], ["user_id", "group_id"])
 @western_duel.action(place)
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
@@ -846,18 +904,22 @@ async def _(event: Event, session: Session):
     session.data[MAG] -= 1
     card = session.data["card"]
     if not card:
-        await event.send_group_message(
-            session.group_id,
-            build_result(f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。"),
-        )
+        await event.send_group_message(session.group_id, f"{session.p1_nickname}已行动，请{session.p2_nickname}开始行动。")
         return tip
     if card == "开枪":
         session.win = session.p1_uid
-        return session.end(tip)
-    if card in {"闪避", "闪枪"}:
+        result = session.end(tip)
+    elif card in {"闪避", "闪枪"}:
         session.win = session.p2_uid
-        return session.end(tip)
-    return tip + "\n本轮平局。"
+        result = session.end(tip)
+    else:
+        result = tip + "\n本轮平局。"
+
+    if event.is_private():
+        await event.send_group_message(session.group_id, result)
+        return "请返回群内查看结果"
+    else:
+        return result
 
 
 buckshot_roulette = Game("恶魔轮盘", "向自己开枪|向对方开枪|使用道具")
@@ -1161,7 +1223,7 @@ async def _(event: Event):
                 return
             # 全员胜利计算
             if winer := [horse for horse in world.racetrack if horse.location == world.track_length - 1]:
-                yield f"> 比赛结束\n> {event.event.kwargs['Bot_Nickname']}正在为您生成战报..."
+                yield f"> 比赛结束\n> {event.Bot_Nickname}正在为您生成战报..."
                 await asyncio.sleep(1)
                 if session.bet:
                     winer_list = []

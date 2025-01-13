@@ -1,6 +1,24 @@
-from collections.abc import Callable
-from clovers.core.plugin import Event as CloversEvent
-from clovers.utils.tools import to_int
+from io import BytesIO
+from collections.abc import Callable, AsyncGenerator
+from clovers import Event as CloversEvent, Result
+from clovers_utils.tools import to_int
+
+
+def build_result(result):
+    if isinstance(result, str):
+        return Result("text", result)
+    if isinstance(result, BytesIO):
+        return Result("image", result)
+    if isinstance(result, list):
+        return Result("list", [build_result(seg) for seg in result])
+    if isinstance(result, AsyncGenerator):
+
+        async def output():
+            async for x in result:
+                yield build_result(x)
+
+        return Result("segmented", output())
+    return result
 
 
 class Event:
@@ -15,44 +33,54 @@ class Event:
     def args(self):
         return self.event.args
 
+    async def send_group_message(self, group_id: str, result):
+        return await self.event.call("group_message", {"group_id": group_id, "data": build_result(result)})
+
+    async def send_private_message(self, user_id: str, result):
+        return await self.event.call("private_message", {"user_id": user_id, "data": build_result(result)})
+
+    @property
+    def Bot_Nickname(self):
+        return self.event.properties["Bot_Nickname"]
+
     @property
     def user_id(self) -> str:
-        return self.event.kwargs["user_id"]
+        return self.event.properties["user_id"]
 
     @property
     def group_id(self) -> str:
-        return self.event.kwargs["group_id"]
+        return self.event.properties["group_id"]
 
     @property
     def nickname(self) -> str:
-        return self.event.kwargs["nickname"].replace("\n", "").replace(" ", "")
+        return self.event.properties["nickname"].replace("\n", "").replace(" ", "")
 
     @property
     def permission(self) -> int:
-        return self.event.kwargs["permission"]
+        return self.event.properties["permission"]
 
     @property
     def to_me(self) -> bool:
-        return self.event.kwargs["to_me"]
+        return self.event.properties["to_me"]
 
     @property
     def at(self) -> list[str]:
-        return self.event.kwargs["at"]
+        return self.event.properties["at"]
 
     def is_private(self) -> bool:
         return self.group_id is None
 
     @property
     def avatar(self) -> str | None:
-        return self.event.kwargs["avatar"]
+        return self.event.properties["avatar"]
 
     @property
     def image_list(self) -> list[str]:
-        return self.event.kwargs["image_list"]
+        return self.event.properties["image_list"]
 
     @property
     def group_avatar(self) -> str | None:
-        return self.event.kwargs["group_avatar"]
+        return self.event.properties["group_avatar"]
 
     def args_to_int(self):
         if args := self.args:
@@ -88,15 +116,6 @@ class Event:
     def single_arg(self):
         if args := self.args:
             return args[0]
-
-    async def send_group_message(self, group_id: str, result):
-        func = self.event.kwargs.get("send_group_message")
-        if not func:
-            return
-        try:
-            await func(group_id=group_id, result=result)
-        except Exception as e:
-            print(e)
 
 
 class Rule:

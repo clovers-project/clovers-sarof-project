@@ -2,12 +2,12 @@ import time
 import asyncio
 from collections import Counter
 from collections.abc import Coroutine, Callable, Sequence
-from clovers.utils.tools import to_int
+from clovers_utils.tools import to_int
 from clovers_leafgame.main import manager
 from clovers_leafgame.item import Prop, GOLD
 from clovers_leafgame.output import text_to_image, endline
 from clovers_leafgame.core.clovers import Event
-from clovers.core.config import config as clovers_config
+from clovers.config import config as clovers_config
 from .config import Config
 
 config_key = __package__

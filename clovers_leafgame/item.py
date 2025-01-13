@@ -10,7 +10,7 @@ import os
 import json
 from pathlib import Path
 from .core.data import Prop
-from clovers.utils.library import Library
+from clovers_utils.library import Library
 
 
 def item_name_rule(item_name: str):

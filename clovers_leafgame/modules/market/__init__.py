@@ -5,14 +5,14 @@ import random
 from io import BytesIO
 from collections import Counter
 from clovers_apscheduler import scheduler
-from clovers.core.logger import logger
-from clovers.utils.tools import gini_coef, format_number
+from clovers.logger import logger
+from clovers_utils.tools import gini_coef, format_number
 from clovers_leafgame.core.clovers import Event, Rule
 from clovers_leafgame.core.data import Account, Group, Stock
 from clovers_leafgame.main import plugin, manager
 from clovers_leafgame.item import GOLD, LICENSE, STD_GOLD, REVOLUTION_MARKING, item_name_rule
 from clovers_leafgame.output import text_to_image, endline, invest_card, prop_card
-from clovers.core.config import config as clovers_config
+from clovers.config import config as clovers_config
 from .config import Config
 
 config_key = __package__

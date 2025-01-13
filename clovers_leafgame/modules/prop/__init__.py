@@ -3,15 +3,16 @@ import asyncio
 import time
 from datetime import datetime, timedelta
 from collections import Counter
-from clovers.core.plugin import Plugin
+from clovers import Plugin
 from clovers_leafgame.core.clovers import Event, Rule
 from clovers_leafgame.main import plugin, manager
 from clovers_leafgame.item import Prop, GOLD, STD_GOLD
-from .core import usage, gacha, AIR_PACK, RED_PACKET
 from clovers_leafgame.output import prop_card, bank_card
+
+from .core import usage, gacha, AIR_PACK, RED_PACKET
 from .output import report_card
 
-from clovers.core.config import config as clovers_config
+from clovers.config import config as clovers_config
 from .config import Config
 
 config_key = __package__
@@ -154,7 +155,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         return f"你获得了{count}金币"
     else:
         RED_PACKET.deal(RED_PACKET.locate_bank(user, account), 1)
-        return f"你失去了{count}金币。\n{event.event.kwargs['Bot_Nickname']}送你1个『随机红包』，祝你好运~"
+        return f"你失去了{count}金币。\n{event.Bot_Nickname}送你1个『随机红包』，祝你好运~"
 
 
 @usage("超级幸运硬币", ["user_id", "group_id", "nickname", "Bot_Nickname"])
@@ -170,7 +171,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     else:
         account.bank[GOLD.id] = 0
         RED_PACKET.deal(RED_PACKET.locate_bank(user, account), 1)
-        return f"你失去了{gold}金币。\n{event.event.kwargs['Bot_Nickname']}送你1个『随机红包』，祝你好运~"
+        return f"你失去了{gold}金币。\n{event.Bot_Nickname}送你1个『随机红包』，祝你好运~"
 
 
 @usage("道具兑换券", ["user_id", "group_id", "nickname"])
@@ -212,7 +213,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
     tip = "请输入你要回档的日期:\n" + "\n".join(folders.keys())
     key = f"{user_id} {group_id}"
 
-    @plugin.temp_handle(key, extra_args=["user_id", "group_id"], rule=Rule.locate(user_id, group_id))
+    @plugin.temp_handle(key, ["user_id", "group_id"], rule=Rule.locate(user_id, group_id))
     async def _(event: Event, finish):
         date = event.raw_command
         folder = folders.get(date)
@@ -222,7 +223,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
         tip2 = "请输入你要回档的时间:\n" + "\n".join(files.keys())
         finish()
 
-        @plugin.temp_handle(key, extra_args=["user_id", "group_id"], rule=Rule.locate(user_id, group_id))
+        @plugin.temp_handle(key, ["user_id", "group_id"], rule=Rule.locate(user_id, group_id))
         async def _(event: Event, finish):
             clock = event.raw_command
             file = files.get(clock)
@@ -258,7 +259,7 @@ async def _(prop: Prop, event: Event, count: int, extra: str):
             return f"您需要在{revival_date.strftime('%Y年%m月%d日')}后才能使用此道具"
         del death_cd[user_id]
 
-    @plugin.temp_handle(f"{user_id} {group_id}", extra_args=["user_id", "group_id"], timeout=60, rule=Rule.locate(user_id, group_id))
+    @plugin.temp_handle(f"{user_id} {group_id}", ["user_id", "group_id"], timeout=60, rule=Rule.locate(user_id, group_id))
     async def _(event: Event, finish: Plugin.Finish):
         finish()
         command = event.raw_command

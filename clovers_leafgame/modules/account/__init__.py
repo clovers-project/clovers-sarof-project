@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime
 from PIL import ImageColor
 from collections import Counter
-from clovers.utils.tools import download_url, format_number
+from clovers_utils.tools import download_url, format_number
 from clovers_leafgame.core.clovers import Event, Rule
 from clovers_leafgame.main import plugin, manager
 from clovers_leafgame.item import (
@@ -24,7 +24,7 @@ from clovers_leafgame.output import (
     avatar_card,
     dist_card,
 )
-from clovers.core.config import config as clovers_config
+from clovers.config import config as clovers_config
 from .config import Config
 
 
@@ -352,7 +352,7 @@ async def _(event: Event):
     user, account = manager.locate_account(event.at[0], group_id)
     confirm = "".join(str(random.randint(0, 9)) for _ in range(4))
 
-    @plugin.temp_handle(f"{confirm} {user_id} {group_id}", extra_args=["user_id", "group_id", "permission"])
+    @plugin.temp_handle(f"{confirm} {user_id} {group_id}", ["user_id", "group_id", "permission"])
     async def _(temp_event: Event, finish):
         if temp_event.user_id != user_id or temp_event.group_id != group_id:
             return
