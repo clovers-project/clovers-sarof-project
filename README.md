@@ -5,10 +5,11 @@
 
 _✨ 改自 [nonebot_plugin_russian](https://github.com/HibiKier/nonebot_plugin_russian) 和 [nonebot_plugin_horserace](https://github.com/shinianj/nonebot_plugin_horserace) 的小游戏合集 ✨_
 
-<img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="python">
-<a href="./LICENSE"><img src="https://img.shields.io/github/license/KarisAya/clovers_leafgame.svg" alt="license"></a>
-<a href="https://pypi.python.org/pypi/clovers_leafgame"><img src="https://img.shields.io/pypi/v/clovers_leafgame.svg" alt="pypi"></a>
-<a href="https://pypi.python.org/pypi/clovers_leafgame"><img src="https://img.shields.io/pypi/dm/clovers_leafgame" alt="pypi download"></a>
+[![python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/)
+[![license](https://img.shields.io/github/license/KarisAya/clovers_leafgame.svg)](./LICENSE)
+[![pypi](https://img.shields.io/pypi/v/clovers_leafgame.svg)](https://pypi.python.org/pypi/clovers_leafgame)
+[![pypi download](https://img.shields.io/pypi/dm/clovers_leafgame)](https://pypi.python.org/pypi/clovers_leafgame)
+[![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
 
 </div>
 
