@@ -3,7 +3,7 @@ from pathlib import Path
 from collections.abc import Callable
 from .horse import Horse, Event, Event_list
 from .start import load_dlcs
-from clovers.core.config import config as clovers_config
+from clovers.config import config as clovers_config
 from .config import Config
 
 config_key = __package__

@@ -24,6 +24,7 @@ from clovers_leafgame.output import (
     avatar_card,
     dist_card,
 )
+from clovers import Plugin
 from clovers.config import config as clovers_config
 from .config import Config
 
@@ -45,10 +46,14 @@ async def _(event: Event):
     if LICENSE.deal(user.bank, -1):
         return f"你未持有【{LICENSE.name}】"
     log = []
-    BG_type = event.single_arg()
-    if BG_type:
-        if BG_type in {"高斯模糊", "模糊"}:
-            user.extra["BG_type"] = "GAUSS"
+    if args := event.args:
+        BG_type = args[0]
+        if BG_type.startswith("高斯模糊"):
+            try:
+                radius = int(args[1])
+            except:
+                radius = 16
+            user.extra["BG_type"] = f"GAUSS:{radius}"
         elif BG_type in {"无", "透明"}:
             user.extra["BG_type"] = "NONE"
         elif BG_type == "默认":
@@ -60,7 +65,6 @@ async def _(event: Event):
                 user.extra["BG_type"] = BG_type
             except ValueError:
                 BG_type = "ValueError"
-                pass
         log.append(f"背景蒙版类型设置为：{BG_type}")
 
     if url_list := event.image_list:
@@ -164,7 +168,6 @@ async def _(event: Event):
         lines.append(clovers_marking)
     if REVOLUTION_MARKING.N(user, account):
         lines.append(revolution_marking)
-
     info.append(
         avatar_card(
             await download_url(user.avatar_url),
@@ -175,7 +178,7 @@ async def _(event: Event):
     lines = []
     for marking_prop in manager.marking_library.values():
         if count := marking_prop.N(user, account):
-            lines.append(f"[color][{marking_prop.color}]Lv.{min(count, 99)}[nowrap][passport]\n[pixel][160]{marking_prop.tip}")
+            lines.append(f"[font color={marking_prop.color}]Lv.{min(count, 99)}[pixel 160]{marking_prop.tip}")
     if lines:
         info.append(text_to_image("\n".join(lines)))
     lines = []
@@ -187,8 +190,8 @@ async def _(event: Event):
         if std_n > 0:
             dist.append((std_n, group.nickname))
         sum_std_n += std_n
-    lines.append(f"[color][#FFCC33]金币 {format_number(sum_std_n)}")
-    lines.append(f"[color][#0066CC]股票 {format_number(manager.stock_value(user.invest))}")
+    lines.append(f"[font color=#FFCC33]金币 {format_number(sum_std_n)}")
+    lines.append(f"[font color=#0066CC]股票 {format_number(manager.stock_value(user.invest))}")
     info.append(text_to_image("\n".join(lines), 40, canvas=dist_card(dist)))
     data = manager.invest_data(user.invest)
     if data:
@@ -199,9 +202,9 @@ async def _(event: Event):
     else:
         delta_days = (datetime.today() - account.sign_in).days
     if delta_days == 0:
-        lines.append("[color][green]本群今日已签到")
+        lines.append("[font color=green]本群今日已签到")
     else:
-        lines.append(f"[color][red]本群连续{delta_days}天 未签到")
+        lines.append(f"[font color=red]本群连续{delta_days}天 未签到")
     lines += user.message
     info.append(text_to_image("\n".join(lines) + endline("Message"), 30, autowrap=True))
     user.message.clear()
@@ -316,7 +319,7 @@ async def _(event: Event):
                 nickname = nickname if len(nickname := account.name) < 7 else nickname[:6] + ".."
             else:
                 nickname = "已注销"
-            return f"{nickname}[nowrap]\n[right]{n}次"
+            return f"{nickname}[right]{n}次"
 
         info.append(text_to_image("\n".join(result(*seg) for seg in ranklist[:10]) + endline("路灯挂件榜")))
     if record := group.extra.get("stock_record"):
@@ -352,12 +355,10 @@ async def _(event: Event):
     user, account = manager.locate_account(event.at[0], group_id)
     confirm = "".join(str(random.randint(0, 9)) for _ in range(4))
 
-    @plugin.temp_handle(f"{confirm} {user_id} {group_id}", ["user_id", "group_id", "permission"])
-    async def _(temp_event: Event, finish):
-        if temp_event.user_id != user_id or temp_event.group_id != group_id:
-            return
+    @plugin.temp_handle(f"{confirm} {user_id} {group_id}", ["user_id", "group_id", "permission"], rule=Rule.locate(user_id, group_id))
+    async def _(event: Event, finish: Plugin.Finish):
         finish()
-        if temp_event.raw_command != confirm:
+        if event.raw_command != confirm:
             return "【冻结】已取消。"
         bank = Counter()
         bank += user.bank

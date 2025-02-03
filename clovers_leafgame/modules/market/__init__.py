@@ -259,7 +259,7 @@ async def _(event: Event):
     stock.value = stock_value + int_value
     output = BytesIO()
     text_to_image(
-        f"{stock.name}\n----" f"\n数量：{_buy}" f"\n单价：{round(value/_buy,2)}" f"\n总计：{int_value}" + endline(tip),
+        f"{stock.name}\n----\n数量：{_buy}\n单价：{round(value/_buy,2)}\n总计：{int_value}" + endline(tip),
         width=440,
         bg_color="white",
     ).save(output, format="png")

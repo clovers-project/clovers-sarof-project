@@ -1,7 +1,7 @@
 import random
 import asyncio
 from collections import Counter
-from clovers_leafgame.main import plugin, manager, build_result
+from clovers_leafgame.main import plugin, manager
 from clovers_leafgame.core.clovers import Event, Result
 from clovers_leafgame.output import text_to_image, BytesIO
 from .core import Session, Game, to_int
@@ -942,18 +942,18 @@ def buckshot_roulette_random_props(props_num: int):
 def buckshot_roulette_status(session: Session):
 
     result = []
-    result.append(f"玩家 {session.p1_nickname}[nowrap]\n[pixel][340]玩家 {session.p2_nickname}")
-    heart = lambda n: f"血量 [nowrap]\n[color][red]{n * '♥'}"
-    result.append(f"{heart(session.data['HP1'])}[nowrap]\n[pixel][340]{heart(session.data['HP2'])}")
+    result.append(f"玩家 {session.p1_nickname}[pixel 340]玩家 {session.p2_nickname}")
+    heart = lambda n: f"血量 [font color=red]{n * '♥'}"
+    result.append(f"{heart(session.data['HP1'])}[pixel 340]{heart(session.data['HP2'])}")
     result.append("----")
     props1 = [f"{k} {v}" for k, v in Counter(session.data["props1"]).items()]
-    props2 = [f"[pixel][340]{k} {v}" for k, v in Counter(session.data["props2"]).items()]
+    props2 = [f"[pixel 340]{k} {v}" for k, v in Counter(session.data["props2"]).items()]
     props = [["", ""] for _ in range(max(len(props1), len(props2)))]
     for i, x in enumerate(props1):
         props[i][0] = x
     for i, x in enumerate(props2):
         props[i][1] = x
-    result.append("\n".join(f"{x}[nowrap]\n{y}" for x, y in props))
+    result.append("\n".join(x + y for x, y in props))
     output = BytesIO()
     text_to_image("\n".join(result), bg_color="white", width=660).save(output, format="png")
     return output

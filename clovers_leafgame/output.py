@@ -26,7 +26,7 @@ def text_to_image(text: str, font_size=40, width=880, **kwargs):
 
 
 def endline(tip: str) -> str:
-    return f"\n----\n[right][color][grey][font][][30]{tip}"
+    return f"\n----\n[right][font color=grey,size=30]{tip}"
 
 
 def bank_card(data: list[tuple[Prop, int]]):
@@ -36,8 +36,7 @@ def bank_card(data: list[tuple[Prop, int]]):
         quant = {0: "天", 1: "个"}[prop.flow]
         return linecard(
             (
-                f"[font][][60][color][{prop.color}]【{prop.name}】[nowrap][passport]\n"
-                f"[right]{format_number(n)}{quant}\n"
+                f"[font size=60,color={prop.color}]【{prop.name}】[right]{format_number(n)}{quant}\n"
                 f"----\n{prop.intro.replace('\n','[passport]\n')}"
                 f"\n[right]{prop.tip.replace('\n','[passport]\n')}"
             ),
@@ -55,11 +54,7 @@ def prop_card(data: list[tuple[Prop, int]], tip: str | None = None):
 
     def result(prop: Prop, n: int):
         quant = {0: "天", 1: "个"}.get(prop.flow)
-        return (
-            f"[color][{prop.color}]{prop.name}[nowrap][passport]\n"
-            f"[pixel][350]{prop.rare*'☆'}[nowrap][passport]\n"
-            f"[right]{format_number(n)}{quant}"
-        )
+        return f"[font color={prop.color}]{prop.name}[pixel 350]{prop.rare*'☆'}[right]{format_number(n)}{quant}"
 
     info = "\n".join(result(*args) for args in data)
     if tip:
@@ -73,10 +68,10 @@ def invest_card(data: list[tuple[Stock, int]], tip: str | None = None):
         buy = format_number(max(stock.floating, stock.value) / issuance) if issuance else "未发行"
         sell = format_number(stock.floating / issuance) if issuance else "未发行"
         return (
-            f"[pixel][20]{stock.name}\n"
-            f"[pixel][20]数量 [nowrap]\n[color][{'green' if n else 'red'}]{n}[nowrap]\n"
-            f"[pixel][280]购买 [nowrap]\n[color][{'red' if buy > sell else 'green'}]{buy}[nowrap]\n"
-            f"[pixel][580]结算 [nowrap]\n[color][green]{sell}[nowrap]\n"
+            f"[pixel 20]{stock.name}\n"
+            f"[pixel 20][font color=black]数量 [font color={'green' if n else 'red'}]{n}"
+            f"[pixel 280][font color=black]购买 [font color={'red' if buy > sell else 'green'}]{buy}"
+            f"[pixel 580][font color=black]结算 [font color=green]{sell}"
         )
 
     info = "\n".join(result(*args) for args in data)
@@ -95,7 +90,7 @@ def avatar_card(avatar: bytes | None, nickname: str, lines: list[str]):
     if avatar:
         canvas.paste(Image.open(BytesIO(avatar)).resize((260, 260)), (20, 20), AVATAR_MASK)
     draw = ImageDraw.Draw(canvas)
-    draw.text((300, 40), f"{nickname}", fill=(0, 0, 0), font=font)
+    canvas.paste(linecard(nickname, font_manager, 40, width=580, padding=(0, 10)), (300, 40))
     draw.line(((300, 120), (860, 120)), fill="gray", width=4)
     for n, line in enumerate(lines):
         draw.text((300, 140 + n * 50), "•", fill="gray", font=font)

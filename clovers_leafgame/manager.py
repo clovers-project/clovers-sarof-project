@@ -9,11 +9,37 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import shutil
 from collections import Counter
-from clovers_utils.linecard import info_splicing, ImageList
+from io import BytesIO
+
+from PIL import ImageFilter, Image
+from PIL.Image import Image as IMG
+
+
+from clovers_utils.linecard import info_splicing, ImageList, CanvasEffectHandler
 from clovers_utils.library import Library
 from .core.clovers import Event
 from .core.data import Account, Group, Account, DataBase
 from .item import Prop, props_library, marking_library, VIP_CARD
+
+
+def canvas_effect(canvas: IMG, image: IMG, padding: int, width: int, height: int):
+    box = (padding, height, width + padding - 4, height + image.size[1] - 4)
+    region = canvas.crop(box)
+    colorBG = Image.new("RGBA", (width, image.size[1]), "#0000000F")
+    canvas.paste(colorBG, (padding + 4, height + 4), mask=colorBG)
+    canvas.paste(region, box)
+    box = (padding + 4, height + 4, width + padding - 4, height + image.size[1] - 4)
+    region = canvas.crop(box)
+    colorBG = Image.new("RGBA", (width, image.size[1]), "#00000022")
+    canvas.paste(colorBG, (padding, height), mask=colorBG)
+    canvas.paste(region, box)
+    colorBG = Image.new("RGBA", (region.width, region.height), "#FFFFFF22")
+    region.paste(colorBG, mask=colorBG)
+    canvas.paste(region, box)
+    box = (padding, height, width + padding, height + image.size[1])
+    region = canvas.crop(box).filter(ImageFilter.BLUR).filter(ImageFilter.GaussianBlur(radius=8))
+    canvas.paste(region, box)
+    canvas.paste(image, (padding, height), mask=image)
 
 
 class Manager:
@@ -62,13 +88,15 @@ class Manager:
                 info.append(f"备份 {folder} 已删除！")
         return "\n".join(info)
 
-    def info_card(self, info: ImageList, user_id: str, BG_type=None):
+    def info_card(self, info: ImageList, user_id: str, BG_type: str | CanvasEffectHandler = canvas_effect):
         extra = self.data.user(user_id).extra
-        BG_type = BG_type or extra.get("BG_type", "#FFFFFF99")
+        BG_type = extra.get("BG_type") or BG_type
         BG_PATH = self.BG_PATH / f"{user_id}.png"
         if not BG_PATH.exists():
             BG_PATH = self.BG_PATH / "default.png"
-        return info_splicing(info, BG_PATH, spacing=10, BG_type=BG_type)
+        output = BytesIO()
+        info_splicing(info, BG_PATH, spacing=10, BG_type=BG_type).save(output, format="png")
+        return output
 
     def new_account(self, user_id: str, group_id: str, **kwargs):
         account = Account(user_id=user_id, group_id=group_id, sign_in=datetime.today() - timedelta(days=1), **kwargs)

@@ -134,9 +134,9 @@ class Session:
         lose_achieve[win] = 0
         lose_achieve[lose] += 1
         card = (
-            f"[pixel][20]◆胜者 {win_name}[nowrap]\n[pixel][460]◇败者 {lose_name}\n"
-            f"[pixel][20]◆战绩 {win_rank[win]}:{lose_rank[win]}[nowrap]\n[pixel][460]◇战绩 {win_rank[lose]}:{lose_rank[lose]}\n"
-            f"[pixel][20]◆连胜 {win_achieve[win]}[nowrap]\n[pixel][460]◇连败 {lose_achieve[lose]}"
+            f"[pixel 20]◆胜者 {win_name}[pixel 460]◇败者 {lose_name}\n"
+            f"[pixel 20]◆战绩 {win_rank[win]}:{lose_rank[win]}[pixel 460]◇战绩 {win_rank[lose]}:{lose_rank[lose]}\n"
+            f"[pixel 20]◆连胜 {win_achieve[win]}[pixel 460]◇连败 {lose_achieve[lose]}"
         )
         info.insert(0, text_to_image(card + endline("对战")))
         result = [f"这场对决是 {win_name} 胜利了", manager.info_card(info, win)]
