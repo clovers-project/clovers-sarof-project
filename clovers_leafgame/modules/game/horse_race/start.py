@@ -1,7 +1,7 @@
 ﻿from pathlib import Path
 import json
 from .horse import Event
-from clovers.core.logger import logger
+from clovers.logger import logger
 
 
 def load_dlcs(resource_path: Path = Path(__file__).parent / "event_library") -> list[Event]:
@@ -14,7 +14,7 @@ def load_dlcs(resource_path: Path = Path(__file__).parent / "event_library") -> 
                 events_list += [deal(event) for event in json.load(f) if event]
             logger.info(f"{log} 成功！")
         except:
-            logger.warn(f"{log} 失败...")
+            logger.warning(f"{log} 失败...")
 
     return events_list
 
