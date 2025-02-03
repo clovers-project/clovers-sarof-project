@@ -943,8 +943,9 @@ def buckshot_roulette_status(session: Session):
 
     result = []
     result.append(f"玩家 {session.p1_nickname}[pixel 340]玩家 {session.p2_nickname}")
-    heart = lambda n: f"血量 [font color=red]{n * '♥'}"
-    result.append(f"{heart(session.data['HP1'])}[pixel 340]{heart(session.data['HP2'])}")
+    result.append(
+        f"血量 [font color=red]{session.data['HP1'] * '♥'}[pixel 340][font color=black]血量 [font color=red]{session.data['HP2'] * '♥'}"
+    )
     result.append("----")
     props1 = [f"{k} {v}" for k, v in Counter(session.data["props1"]).items()]
     props2 = [f"[pixel 340]{k} {v}" for k, v in Counter(session.data["props2"]).items()]
@@ -1011,7 +1012,7 @@ async def _(event: Event, session: Session):
         hp_others = "HP1"
         buff = "buff2"
     target = event.raw_command[1:3]
-    hp = hp_self if event.raw_command == "自己" else hp_others
+    hp = hp_self if target == "自己" else hp_others
 
     def remove_tag(buffs: set[str], tag: str):
         if tag in buffs:
