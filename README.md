@@ -1,25 +1,26 @@
 <!-- markdownlint-disable MD031 MD033 MD036 MD041 -->
 <div align="center">
 
-# clovers-leafgame
+# Clovers-LeafGame
 
 _✨ 改自 [nonebot_plugin_russian](https://github.com/HibiKier/nonebot_plugin_russian) 和 [nonebot_plugin_horserace](https://github.com/shinianj/nonebot_plugin_horserace) 的小游戏合集 ✨_
 
-[![python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/)
-[![license](https://img.shields.io/github/license/KarisAya/clovers_leafgame.svg)](./LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![pypi](https://img.shields.io/pypi/v/clovers_leafgame.svg)](https://pypi.python.org/pypi/clovers_leafgame)
 [![pypi download](https://img.shields.io/pypi/dm/clovers_leafgame)](https://pypi.python.org/pypi/clovers_leafgame)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
+[![Github](https://img.shields.io/badge/GitHub-Clovers-00CC33?logo=github)](https://github.com/clovers-project/clovers)
+[![license](https://img.shields.io/github/license/clovers-project/clovers-leafgame.svg)](./LICENSE)
 
 </div>
 
-## 💿 安装
+# 安装
 
 ```bash
 pip install clovers_leafgame
 ```
 
-## ⚙️ 配置
+# 配置
 
 <details>
 
@@ -91,7 +92,7 @@ luckey_coin = [ 2000, 100000,]
 
 改图片的时候不用关 bot 也会生效
 
-## 🎉 使用
+# 使用
 
 <details>
   
@@ -703,16 +704,6 @@ ACE 技能：摇一个 6 面骰子，把打出的 ACE 牌点替换成摇出的�
 **请不要同时在多个群进行游戏，如果非要在多个群进行游戏，那么请注意发送游戏进行的指令之前账户是否关联到了对局所在的群。**
 
 </details>
-
-## 📞 联系
-
-如有建议，bug 反馈等可以加群
-
-机器人 bug 研究中心（闲聊群） 744751179
-
-永恒之城（测试群） 724024810
-
-![群号](https://github.com/KarisAya/clovers/blob/master/%E9%99%84%E4%BB%B6/qrcode_1676538742221.jpg)
 
 ## 💡 鸣谢
 
