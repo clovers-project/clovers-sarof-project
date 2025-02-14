@@ -705,7 +705,7 @@ ACE 技能：摇一个 6 面骰子，把打出的 ACE 牌点替换成摇出的�
 
 </details>
 
-## 💡 鸣谢
+# 鸣谢
 
 - [nonebot2](https://github.com/nonebot/nonebot2) 跨平台 Python 异步聊天机器人框架
 - [nonebot_plugin_russian](https://github.com/HibiKier/nonebot_plugin_russian) 轮盘小游戏
