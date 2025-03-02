@@ -4,9 +4,14 @@ from clovers_leafgame.core.clovers import Event
 from ..core import Session, Game
 from .action import place
 
+dice_charlist = [" ", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
+
 
 def bohemia_show_array(array: list[int]):
-    return " | ".join(f"{i}.【{d}】" for i, d in enumerate(array, start=1))
+    output = [f"{i} [{dice_charlist[d]}] " for i, d in enumerate(array, start=1)]
+    if len(array) > 3:
+        output.insert(3, "\n")
+    return "".join(output)
 
 
 def bohemia_dice_pt(array: list[int]):
@@ -29,7 +34,7 @@ def bohemia_dice_pt(array: list[int]):
                 pt = 500 + straight_rest(array)
                 return pt, 5 + int(pt != 500)
             elif 1 not in array_set:
-                pt = 750
+                pt = 750 + straight_rest(array)
                 return pt, 5 + int(pt != 750)
             else:
                 x = array.count(1)
@@ -85,7 +90,7 @@ async def _(session: Session, arg: str):
         tip = f"\n本场下注：{n}{prop.name}/轮"
     else:
         tip = ""
-    session.start_tips = f"桌面 {bohemia_show_array(array)}"
+    session.start_tips = f"桌面：\n{bohemia_show_array(array)}"
     return f"【天国骰子】游戏已创建。{tip}\n{session.create_info()}"
 
 
@@ -112,25 +117,23 @@ async def _(event: Event, session: Session):
         array_others = "array1"
         alive_others = "alive1"
     choise, cmd = event.args
-    array = session.data[array_self]
-
     try:
         choise_array: list[int] = [session.data[array_self][i - 1] for i in map(int, set(choise))]
     except IndexError:
         return
-
     pt, actN = bohemia_dice_pt(choise_array)
     if pt == 0:
         return
-    session.data[pt_table_self] += pt
-    tip = (
-        f"你选择了 {bohemia_show_array(choise_array)}\n"
-        "目标分数 4000\n"
-        f"对方分数 {session.data[pt_others]}\n"
-        f"自己分数 {session.data[pt_self]}\n"
-        f"本轮分数 {session.data[pt_table_self]}"
-    )
+    last_pt = session.data[pt_table_self]
+    session.data[pt_table_self] = last_pt + pt
     if cmd == "继续":
+        tip = (
+            f"你选择了：\n{bohemia_show_array(choise_array)}\n"
+            "目标分数：4000\n"
+            f"对方分数：{session.data[pt_others]}\n"
+            f"自己分数：{session.data[pt_self]}({session.data[pt_self]}+{session.data[pt_table_self]})\n"
+            f"本轮分数：{last_pt} + {pt}"
+        )
         if session.data[alive_self] == actN:
             session.data[alive_self] = 6
         else:
@@ -144,21 +147,29 @@ async def _(event: Event, session: Session):
             return (
                 f"{tip}\n"
                 "继续...\n"
-                f"桌面 {bohemia_show_array(next_array)}\n"
+                f"桌面：\n{bohemia_show_array(next_array)}\n"
                 "本轮失败！\n"
                 f"下一个玩家：{next_user}\n"
-                f"桌面 {bohemia_show_array(next2_array)}"
+                f"桌面：\n{bohemia_show_array(next2_array)}"
             )
         else:
             session.delay()
-            return f"{tip}\n继续...\n桌面 {bohemia_show_array(next_array)}"
+            return f"{tip}\n继续...\n桌面：\n{bohemia_show_array(next_array)}"
     else:
         session.data[pt_self] += session.data[pt_table_self]
+
+        tip = (
+            f"你选择了：\n{bohemia_show_array(choise_array)}\n"
+            "目标分数 4000\n"
+            f"对方分数 {session.data[pt_others]}\n"
+            f"自己分数 {session.data[pt_self]}\n"
+            f"本轮分数 {last_pt} + {pt}"
+        )
         session.data[pt_table_self] = 0
         if session.data[pt_self] >= 4000:
             session.win = user_id
-            return session.end(f"{tip}\n结束...\n桌面 {bohemia_show_array(array)}")
+            return session.end(f"{tip}\n结束...")
         session.data[alive_others] = 6
         session.data[array_others] = next_array = first_random_dice()
         session.nextround()
-        return f"{tip}\n结束...\n下一个玩家：{next_user}\n桌面 {bohemia_show_array(next_array)}"
+        return f"{tip}\n结束...\n下一个玩家：{next_user}\n桌面：\n{bohemia_show_array(next_array)}"
