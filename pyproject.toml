@@ -1,6 +1,6 @@
 [project]
 name = "clovers-leafgame"
-version = "0.2.1"
+version = "0.2.2"
 description = ""
 authors = [{ name = "KarisAya", email = "1048827424@qq.com" }]
 readme = "README.md"
@@ -21,4 +21,3 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.dev.dependencies]
 scipy = "^1.15.1"
-
