@@ -81,10 +81,11 @@ async def _(session: Session, arg: str):
     array = first_random_dice()
     session.data["array1"] = array
     session.data["alive1"] = 6
-    session.data["pt2"] = 500
+    session.data["pt2"] = 0
     session.data["pt2_table"] = 0
     session.data["array2"] = None
     session.data["alive2"] = 6
+    session.data["last_round"] = False
     if session.bet:
         prop, n = session.bet
         tip = f"\n本场下注：{n}{prop.name}/轮"
@@ -131,8 +132,9 @@ async def _(event: Event, session: Session):
             f"你选择了：\n{bohemia_show_array(choise_array)}\n"
             "目标分数：4000\n"
             f"对方分数：{session.data[pt_others]}\n"
-            f"自己分数：{session.data[pt_self]}({session.data[pt_self]}+{session.data[pt_table_self]})\n"
-            f"本轮分数：{last_pt} + {pt}"
+            f"自己分数：{session.data[pt_self]}(+{session.data[pt_table_self]})\n"
+            f"本轮分数：{last_pt} + {pt}\n"
+            "继续..."
         )
         if session.data[alive_self] == actN:
             session.data[alive_self] = 6
@@ -146,7 +148,6 @@ async def _(event: Event, session: Session):
             session.nextround()
             return (
                 f"{tip}\n"
-                "继续...\n"
                 f"桌面：\n{bohemia_show_array(next_array)}\n"
                 "本轮失败！\n"
                 f"下一个玩家：{next_user}\n"
@@ -154,22 +155,29 @@ async def _(event: Event, session: Session):
             )
         else:
             session.delay()
-            return f"{tip}\n继续...\n桌面：\n{bohemia_show_array(next_array)}"
+            return f"{tip}\n桌面：\n{bohemia_show_array(next_array)}"
     else:
         session.data[pt_self] += session.data[pt_table_self]
-
         tip = (
             f"你选择了：\n{bohemia_show_array(choise_array)}\n"
             "目标分数 4000\n"
             f"对方分数 {session.data[pt_others]}\n"
             f"自己分数 {session.data[pt_self]}\n"
-            f"本轮分数 {last_pt} + {pt}"
+            f"本轮分数 {last_pt} + {pt}\n"
+            "结束..."
         )
         session.data[pt_table_self] = 0
+        if session.data["last_round"]:
+            session.win = session.p1_uid if session.data["pt1"] > session.data["pt2"] else session.p2_uid
+            return session.end(tip)
         if session.data[pt_self] >= 4000:
-            session.win = user_id
-            return session.end(f"{tip}\n结束...")
+            if user_id == session.p2_uid:
+                session.win = user_id
+                return session.end(tip)
+            else:
+                session.data["last_round"] = True
+                tip += "\n先手已超分，本轮为最后一轮！"
         session.data[alive_others] = 6
         session.data[array_others] = next_array = first_random_dice()
         session.nextround()
-        return f"{tip}\n结束...\n下一个玩家：{next_user}\n桌面：\n{bohemia_show_array(next_array)}"
+        return f"{tip}\n下一个玩家：{next_user}\n桌面：\n{bohemia_show_array(next_array)}"
