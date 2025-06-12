@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD031 MD033 MD036 MD041 -->
 <div align="center">
 
-# Clovers-LeafGame
+# Clovers-Sarof
 
 _✨ 改自 [nonebot_plugin_russian](https://github.com/HibiKier/nonebot_plugin_russian) 和 [nonebot_plugin_horserace](https://github.com/shinianj/nonebot_plugin_horserace) 的小游戏合集 ✨_
 
