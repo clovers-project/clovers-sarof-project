@@ -4,8 +4,11 @@ import math
 import random
 from io import BytesIO
 from collections import Counter
-from clovers_apscheduler import scheduler
+from linecard import ImageList
+from clovers import TempHandle
 from clovers.logger import logger
+from clovers.config import Config as CloversConfig
+from clovers_apscheduler import scheduler
 from clovers_sarof_core import __plugin__ as plugin, Event, Rule
 from clovers_sarof_core import manager
 from clovers_sarof_core import GOLD, STD_GOLD, REVOLUTION_MARKING, DEBUG_MARKING
@@ -20,9 +23,8 @@ from clovers_sarof_core.linecard import (
     candlestick,
     dist_card,
 )
-from clovers_sarof_core.tools import format_number
-from .tools import gini_coef
-from clovers.config import Config as CloversConfig
+from clovers_sarof_core.tools import format_number, to_int
+from .tools import gini_coef, item_name_rule
 from .config import Config
 
 
@@ -61,7 +63,7 @@ async def _(event: Event):
             return f"当前基尼系数为{gini:f3}，未满足重置条件。"
         ranklist = heapq.nlargest(10, banks, key=lambda x: x.n)
         top = ranklist[0]
-        REVOLUTION_MARKING.deal(session, top.account, 1)
+        REVOLUTION_MARKING.deal(top.account, 1, session)
         for i, bank in enumerate(ranklist):
             bank.n = int(bank.n * i / 10)
             bank.account.extra["revolution"] = False
@@ -71,7 +73,7 @@ async def _(event: Event):
                 bank.n = int(bank.n * rate)
         group.level += 1
         session.commit()
-        return f"当前系数为：{gini:f3}，重置成功！恭喜{top.account.nickname}进入挂件榜☆！重置签到已刷新。"
+    return f"当前系数为：{gini:f3}，重置成功！恭喜{top.account.nickname}进入挂件榜☆！重置签到已刷新。"
 
 
 @plugin.handle(["重置签到", "领取金币"], ["user_id", "group_id", "nickname", "avatar"])
@@ -85,134 +87,199 @@ async def _(event: Event):
         if not account.extra.setdefault("revolution", True):
             return "你没有待领取的金币"
         n = random.randint(*revolt_gold)
-        GOLD.deal(session, account, n)
+        GOLD.deal(account, n, session)
         account.extra["revolution"] = False
+        session.commit()
     return f"这是你重置后获得的金币！你获得了 {n} 金币"
 
 
-@plugin.handle(["金币转入"], ["user_id", "group_id", "nickname"])
+@plugin.handle(["金币转"], ["user_id", "group_id", "nickname"])
 async def _(event: Event):
-    n = event.args_to_int()
-    if n == 0:
+    if not (args := event.args):
         return
-    user, account = manager.account(event)
-    level = manager.data.group(event.group_id).level
-    if n > 0:
-        n_out = n * level
-        if n_out > user.bank[STD_GOLD.id]:
-            n_out = user.bank[STD_GOLD.id]
-            n_in = int(user.bank[STD_GOLD.id] / level)
-        else:
-            n_in = n
-        user.bank[STD_GOLD.id] -= n_out
-        account.bank[GOLD.id] += n_in
-        return f"你成功将{n_out}枚标准金币兑换为{n_in}枚金币"
-    else:
-        n_out = -n
-        if n_out > account.bank[GOLD.id]:
-            n_out = account.bank[GOLD.id]
-            n_in = account.bank[GOLD.id] * level
-        else:
-            n_in = n_out * level
-        user.bank[STD_GOLD.id] += n_in
-        account.bank[GOLD.id] -= n_out
-        return f"你成功将{n_out}枚金币兑换为{n_in}枚标准金币"
+    x, *args = args
+    match x:
+        case "入":
+            if not (len(args) == 1 and args[0].isdigit()):
+                return "请输入正确的数量"
+            n = int(args[0])
+            with manager.db.session as session:
+                account = manager.account(event, session)
+                if account is None:
+                    return "无法在当前会话创建账户。"
+                level = manager.db.group(account.group_id, session).level
+                assert level >= 1
+                n_std = n * level
+                if (tn := STD_GOLD.deal(account, -n_std, session)) is not None:
+                    return f"你的账户中没有足够的{STD_GOLD.name}（{tn}）。"
+                GOLD.deal(account, n, session)
+                session.commit()
+                return f"你成功将{n_std}枚{STD_GOLD.name}兑换为{n}枚{GOLD.name}"
+        case "出":
+            if not (len(args) == 1 and args[0].isdigit()):
+                return "请输入正确的数量"
+            n = int(args[0])
+            with manager.db.session as session:
+                account = manager.account(event, session)
+                if account is None:
+                    return "无法在当前会话创建账户。"
+                level = manager.db.group(account.group_id, session).level
+                assert level >= 1
+                n_std = n * level
+                if (tn := GOLD.deal(account, -n, session)) is not None:
+                    return f"你的账户中没有足够的{GOLD.name}（{tn}）。"
+                STD_GOLD.deal(account, n, session)
+                session.commit()
+                return f"你成功将{n}枚{GOLD.name}兑换为{n_std}枚{STD_GOLD.name}"
+        case "转移":
+            if not (len(args) == 2 and (n := to_int(args[1]))):
+                return "请输入正确的目标账户所在群及数量"
+            with manager.db.session as session:
+                account = manager.account(event, session)
+                if account is None:
+                    return "无法在当前会话创建账户。"
+                group_name = args[0]
+                if group := session.get(Group, group_name):
+                    group_name = group.nickname
+                    group_id = group.id
+                    level = group.level
+                elif stock := Stock.find(group_name, session):
+                    group_id = stock.group_id
+                    level = stock.group.level
+                else:
+                    return f"未找到【{group_name}】"
+                target_account = session.exec(
+                    Account.select().where(
+                        Account.group_id == group_id,
+                        Account.user_id == account.user_id,
+                    )
+                ).one_or_none()
+                if target_account is None:
+                    return f"你在{group_name}没有帐户"
+                if n > 0:
+                    exrate = account.group.level / level
+                    if (tn := GOLD.deal(account, -n, session)) is not None:
+                        return f"你的账户中没有足够的{GOLD.name}（{tn}）。"
+                    receipt = int(n * exrate)
+                    GOLD.deal(target_account, receipt, session)
+                    session.commit()
+                    return f"{account.nickname} 向 目标账户:{group_name} 发送 {n} {GOLD.name}\n汇率 {exrate:3f}\n实际收到 {receipt}"
+                else:
+                    exrate = level / account.group.level
+                    if (tn := GOLD.deal(target_account, -n, session)) is not None:
+                        return f"你的目标账户中没有足够的{GOLD.name}（{tn}）。"
+                    receipt = int(n * exrate)
+                    GOLD.deal(account, receipt, session)
+                    session.commit()
+                    return f"目标账户:{group_name} 向 {account.nickname} 发送 {n} {GOLD.name}\n汇率 {exrate:3f}\n实际收到 {receipt}"
 
 
-@plugin.handle(["金币转移"], ["user_id", "group_id"])
+@plugin.handle(["群金库", "群仓库"], ["user_id", "group_id", "permission"], rule=Rule.group)
 async def _(event: Event):
     if not (args := event.args_parse()):
         return
-    group_name, xfer = args[:2]
-    group_in = manager.group_library.get(group_name)
-    if not group_in:
-        return f"没有 {group_name} 的注册信息"
-    user = manager.data.user(event.user_id)
-    if not (receiver_account_id := user.accounts_map.get(group_in.id)):
-        return f"你在{group_in.nickname}没有帐户"
-    group_out = manager.data.group(event.group_id or user.connect)
-    if not (sender_account_id := user.accounts_map.get(group_out.id)):
-        return "你在本群没有帐户"
-    if (n := group_out.bank[STD_GOLD.id]) < company_public_gold:
-        return f"本群金币过少（{n}<{company_public_gold}），无法完成结算"
-    if (n := group_in.bank[STD_GOLD.id]) < company_public_gold:
-        return f"【{group_in.nickname}】金币过少（{n}<{company_public_gold}），无法完成结算"
-    bank_in = manager.data.account_dict[receiver_account_id].bank
-    bank_out = manager.data.account_dict[sender_account_id].bank
-    if xfer < 0:
-        xfer = -xfer
-        bank_out, bank_in = bank_in, bank_out
-        group_out, group_in = group_in, group_out
-    ExRate = group_out.level / group_in.level
-    receipt = xfer * ExRate
-    if receipt < 1:
-        return f"转入金币{round(receipt,2)}不可小于1枚（汇率：{round(ExRate,2)}）。"
-    if n := GOLD.deal(bank_out, -xfer):
-        return f"数量不足。\n——你还有{n}枚金币。"
-    GOLD.deal(bank_in, int(receipt))
-    return f"{group_out.nickname}向{group_in.nickname}转移{xfer} 金币\n汇率 {round(ExRate,2)}\n实际到账金额 {receipt}"
+    command, n = args[:2]
+    if n < 0:
+        return "请输入正确的数量"
+    group_id: str = event.group_id  # type: ignore
+    user_id = event.user_id
+    if command == "查看":
+        with manager.db.session as session:
+            group = session.get(Group, group_id)
+            if group is None:
+                return "群组不存在。"
+            item_data, stock_data = manager.bank_data(group.bank, session)
+            imagelist: ImageList = []
+            if item_data:
+                if len(item_data) < 6:
+                    imagelist.extend(item_info(item_data))
+                else:
+                    imagelist.append(card_template(item_card(item_data), "群仓库"))
+            if stock_data:
+                imagelist.append(card_template(stock_card(stock_data), "群投资"))
+        return manager.info_card(imagelist, user_id) if imagelist else "群金库是空的"
+    sign, name = command[0], command[1:]
+    with manager.db.session as session:
+        if (item := (manager.items_library.get(name) or Stock.find(name, session))) is None:
+            return f"没有名为 {name} 的道具或股票。"
+        group = session.get(Group, group_id)
+        if group is None:
+            return "群组不存在。"
+        account = manager.db.account(user_id, group_id, session)
+        if sign == "存":
+            if (tn := item.deal(account, -n, session)) is not None:
+                return f"你没有足够的{item.name}（{tn}）"
+            item.corp_deal(group, n, session)
+            return f"你在群仓库存入了{n}个{item.name}"
+        elif sign == "取":
+            if not Rule.group_admin(event):
+                return f"你的权限不足。"
+            if (tn := item.corp_deal(group, -n, session)) is not None:
+                return f"群仓库没有足够的{item.name}（{tn}）"
+            item.deal(account, n, session)
+            return f"你在群仓库取出了{n}个{item.name}"
+
+
+async def corp_rename(event: Event, handle: TempHandle):
+    handle.finish()
+    if event.message != "是":
+        return "重命名已取消"
+    state: tuple[str, str] = handle.state  # type: ignore
+    stock_id, stock_name = state
+    with manager.db.session as session:
+        stock = session.get(Stock, stock_id)
+        if stock is None:
+            return f"{stock_id} 已被注销"
+        stock.name = stock_name
+        session.commit()
 
 
 @plugin.handle(
     ["市场注册", "公司注册", "注册公司"],
-    ["group_id", "to_me", "permission", "group_avatar"],
-    rule=[Rule.to_me, Rule.group_admin],
+    ["user_id", "group_id", "to_me", "permission", "group_avatar"],
+    rule=[Rule.group, Rule.to_me, Rule.group_admin],
 )
 async def _(event: Event):
-    group_id = event.group_id
-    group = manager.data.group(group_id)
-    if group_avatar := event.group_avatar:
-        group.avatar_url = group_avatar
-    stock = group.stock
-    if stock:
-        return f"本群已在市场注册，注册名：{stock.name}"
+    group_id: str = event.group_id  #  type: ignore
     stock_name = event.single_arg()
     if not stock_name:
         return "请输入注册名"
-    if check := item_name_rule(stock_name):
+    if (check := item_name_rule(stock_name)) is not None:
         return check
-    if manager.group_library.get(stock_name) or manager.props_library.get(stock_name):
-        return f"{stock_name} 已被注册"
-    if (gold := group.bank[GOLD.id]) < company_public_gold:
-        return f"本群金库金币（{gold}）小于{company_public_gold}，注册失败。"
-    wealths = manager.group_wealths(group_id, GOLD.id)
-    stock_value = sum(wealths)
-    gini = gini_coef([x for x in wealths[:-1] if x >= gini_filter_gold])
-    if gini > revolt_gini:
-        return f"本群基尼系数（{round(gini,3)}）过高，注册失败。"
-    level = group.level = (sum(ra.values()) if (ra := group.extra.get("revolution_achieve")) else 0) + 1
-    group.bank[STD_GOLD.id] += gold * level
-    group.bank[GOLD.id] = 0
-    stock_value *= level
-    stock = Stock(
-        id=group_id,
-        name=stock_name,
-        value=stock_value,
-        floating=stock_value,
-        issuance=20000 * level,
-        time=time.time(),
-    )
-    manager.group_library.set_item(group.id, {stock_name}, group)
-    return f"{stock.name}发行成功，发行价格为{format_number(stock.value/ 20000)}金币"
-
-
-@plugin.handle(["公司重命名"], ["group_id", "to_me", "permission"], rule=[Rule.to_me, Rule.group_admin])
-async def _(event: Event):
-    group = manager.data.group(event.group_id)
-    stock = group.stock
-    if not stock:
-        return "本群未在市场注册，不可重命名。"
-    stock_name = event.single_arg()
-    if not stock_name:
-        return "请输入注册名"
-    if check := item_name_rule(stock_name):
-        return check
-    if LICENSE.deal(group.bank, -1):
-        return f"本群仓库缺少【{LICENSE.name}】"
-    old_name = stock.name
-    stock.name = stock_name
-    manager.group_library.set_item(group.id, {stock_name}, group)
-    return f"【{old_name}】已重命名为【{stock_name}】"
+    if stock_name in manager.items_library:
+        return f"注册名 {stock_name} 与已有物品重复"
+    with manager.db.session as session:
+        if Stock.find(stock_name, session) is not None:
+            return f"{stock_name} 已被其他群注册"
+        group = manager.db.group(group_id, session)
+        if stock := group.stock:
+            rule: list[Rule.Checker] = [Rule.identify(event.user_id, group_id), lambda event: event.message in "是否"]
+            plugin.temp_handle(["user_id", "group_id", "permission"], rule=rule, state=(stock.id, stock_name))(corp_rename)
+            return f"本群已在市场注册，注册名：{stock.name}，是否修改？【是/否】"
+        if group_avatar := event.group_avatar:
+            group.avatar_url = group_avatar
+        session.commit()
+        group_bank = session.exec(GroupBank.select_item(group.id, GOLD.id)).one_or_none()
+        if group_bank is None or (n := group_bank.n) < company_public_gold:
+            n = n if group_bank else 0
+            return f"把注册到市场要求群金库至少有 {company_public_gold} {GOLD.name}，本群数量：{n}\n请使用指令【群仓库存{GOLD.name}】存入。"
+        group_bank.n = 0
+        stock_value = n * group.level
+        STD_GOLD.corp_deal(group, stock_value, session)
+        stock = group.listed(stock_name, session)
+        stock.corp_deal(group, stock.issuance, session)
+        banks = session.exec(
+            AccountBank.select()
+            .join(Account)
+            .where(
+                AccountBank.item_id == GOLD.id,
+                Account.group_id == group_id,
+            )
+        ).all()
+        stock_value += sum(bank.n for bank in banks) * group.level
+        stock.reset_value(stock_value)
+        session.commit()
+    return f"{stock.name}发行成功，发行价格为{format_number(stock_value/ stock.issuance)}金币"
 
 
 @plugin.handle(["购买", "发行购买"], ["user_id", "group_id", "nickname"])
@@ -220,14 +287,14 @@ async def _(event: Event):
     if not (args := event.args_parse()):
         return
     stock_name, buy, limit = args
-    stock_group = manager.group_library.get(stock_name)
-    if not stock_group or not (stock := stock_group.stock):
-        return f"没有 {stock_name} 的注册信息"
+    with manager.db.session as session:
+        if (stock := Stock.find(stock_name, session)) is None:
+            return f"没有 {stock_name} 的注册信息"
+        buy_count = min
+
     buy = min(stock_group.invest[stock.id], buy)
     if buy < 1:
         return "已售空，请等待结算。"
-    if (n := stock_group.bank[GOLD.id]) < company_public_gold:
-        return f"本群金币过少（{n}<{company_public_gold}），无法完成结算"
     stock_level = stock_group.level
     stock_value = sum(manager.group_wealths(stock.id, GOLD.id)) * stock_level + stock_group.bank[STD_GOLD.id]
     user, account = manager.account(event)

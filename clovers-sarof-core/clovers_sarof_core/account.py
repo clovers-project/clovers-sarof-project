@@ -13,13 +13,43 @@ class SQLModel(BaseSQLModel):
         return select(cls)
 
 
-class BaseItem(SQLModel):
+class BaseItem:
+    id: str = Field(primary_key=True)
+    name: str = Field(index=True)
+
+    def deal(self, account: "Account", unsettled: int, session: Session):
+        bank = self.bank(account, session)
+        return self.bank_deal(bank, unsettled, session)
+
+    def bank(self, account: "Account", session: Session) -> "BaseBank":
+        raise NotImplementedError
+
+    def corp_deal(self, group: "Group", unsettled: int, session: Session):
+        bank = group.item(self.id, session).one_or_none() or BaseBank(item_id=self.id, bound_id=group.id)
+        return self.bank_deal(bank, unsettled, session)
+
+    @staticmethod
+    def bank_deal(bank: "BaseBank", unsettled: int, session: Session):
+        if unsettled < 0 and bank.n < (-unsettled):
+            return bank.n
+        bank.n += unsettled
+        if bank.n <= 0:
+            # assert bank.n == 0
+            BankType = type(bank)
+            if (_bank := session.get(BankType, BankType.id == bank.id)) is not None:
+                session.delete(_bank)
+        else:
+            session.add(bank)
+        session.commit()
+
+
+class BaseSQLItem(SQLModel):
     id: str = Field(primary_key=True)
     name: str = Field(index=True)
 
     @classmethod
     def find(cls, name: str, session: Session):
-        return session.exec(select(cls).where(cls.name == name)).first()
+        return session.exec(select(cls).where(cls.name == name)).one_or_none()
 
 
 class BaseBank(SQLModel):
@@ -33,7 +63,7 @@ class BaseBank(SQLModel):
         return select(cls).where(cls.bound_id == bound_id, cls.item_id == item_id)
 
 
-class Entity(BaseItem):
+class Entity(BaseSQLItem):
     name: str
     BankType: ClassVar[type[BaseBank]]
 
@@ -57,7 +87,7 @@ class Exchange(BaseBank, table=True):
     quote: float = 0.0
 
 
-class Stock(Entity, table=True):
+class Stock(BaseItem, Entity, table=True):
     BankType = Exchange
     exchange: list[Exchange] = Relationship(back_populates="stock", cascade_delete=True)
     # relation
@@ -73,6 +103,13 @@ class Stock(Entity, table=True):
     time: datetime
     """注册时间"""
     extra: dict[str, Any] = Field(default_factory=dict, sa_column=Column(MutableDict.as_mutable(SQLiteJSON())))
+
+    def reset_value(self, value: int):
+        self.value = value
+        self.floating = float(value)
+
+    def bank(self, account: "Account", session: Session):
+        return account.user.item(self.id, session).one_or_none() or UserBank(item_id=self.id, bound_id=account.user_id)
 
 
 class AccountBank(BaseBank, table=True):
@@ -144,10 +181,18 @@ class Group(Entity, table=True):
         if self.stock is not None:
             self.stock.name = name
         else:
-            self.stock = Stock(id=f"stock:{self.id}", name=name, group_id=self.id, time=datetime.today())
+            self.stock = Stock(
+                id=f"stock:{self.id}",
+                name=name,
+                group_id=self.id,
+                time=datetime.today(),
+                issuance=20000 * self.level,
+            )
         session.add(self)
         session.add(self.stock)
         session.commit()
+        session.refresh(self)
+        return self.stock
 
 
 class DataBase:
@@ -175,7 +220,7 @@ class DataBase:
 
     def account(self, user_id: str, group_id: str, session: Session):
         query = select(Account).where(Account.user_id == user_id, Account.group_id == group_id)
-        account = session.exec(query).first()
+        account = session.exec(query).one_or_none()
         user = self.user(user_id, session)
         group = self.group(group_id, session)
         if account is None:
@@ -189,7 +234,7 @@ class DataBase:
         return Session(self.engine)
 
 
-class Item:
+class Item(BaseItem):
     id: str
     """ID"""
     name: str
@@ -247,32 +292,18 @@ class Item:
 
         return {"item_id": self.id, "name": self.name, "color": self.color, "intro": self.intro, "tip": self.tip}
 
-    def deal(self, session: Session, account: Account, unsettled: int):
-        bank = self.bank(session, account)
-        return self.bank_deal(session, bank, unsettled)
+    def deal(self, account: Account, unsettled: int, session: Session):
+        bank = self.bank(account, session)
+        return self.bank_deal(bank, unsettled, session)
 
-    def bank(self, session: Session, account: Account) -> BaseBank:
+    def bank(self, account: Account, session: Session) -> BaseBank:
         raise NotImplementedError
 
-    def account_bank(self, session: Session, account: Account):
+    def account_bank(self, account: Account, session: Session):
         account_id = account.id
         if account_id is None:
             raise ValueError("account_id is None")
-        return account.item(self.id, session).first() or AccountBank(item_id=self.id, bound_id=account_id)
+        return account.item(self.id, session).one_or_none() or AccountBank(item_id=self.id, bound_id=account_id)
 
-    def user_bank(self, session: Session, account: Account):
-        return account.user.item(self.id, session).first() or UserBank(item_id=self.id, bound_id=account.user_id)
-
-    @staticmethod
-    def bank_deal(session: Session, bank: BaseBank, unsettled: int):
-        if unsettled < 0 and bank.n < (-unsettled):
-            return bank.n
-        bank.n += unsettled
-        if bank.n <= 0:
-            # assert bank.n == 0
-            BankType = type(bank)
-            if (_bank := session.get(BankType, BankType.id == bank.id)) is not None:
-                session.delete(_bank)
-                session.commit()
-        else:
-            session.add(bank)
+    def user_bank(self, account: Account, session: Session):
+        return account.user.item(self.id, session).one_or_none() or UserBank(item_id=self.id, bound_id=account.user_id)

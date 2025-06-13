@@ -16,3 +16,12 @@ def gini_coef(wealths: list[int]) -> float:
 
 def integer_log(number, base) -> int:
     return int(np.log(number) / np.log(base))
+
+
+def item_name_rule(item_name: str) -> str | None:
+    if " " in item_name or "\n" in item_name:
+        return "名称不能含有空格或回车"
+    if len(item_name.encode()) > 60:
+        return f"名称不能超过60字符"
+    if item_name.isdigit():
+        return f"名称不能是数字"

@@ -7,7 +7,7 @@ from clovers.config import Config as CloversConfig
 from clovers_sarof_core import __plugin__ as plugin, Event, Rule
 from clovers_sarof_core import manager, client
 from clovers_sarof_core import GOLD, STD_GOLD, REVOLUTION_MARKING, DEBUG_MARKING
-from clovers_sarof_core.account import Stock, Account, Group, AccountBank, UserBank, GroupBank
+from clovers_sarof_core.account import Stock, Account, Group, AccountBank
 from clovers_sarof_core.linecard import (
     text_to_image,
     card_template,
@@ -88,7 +88,7 @@ async def _(event: Event):
             account.user.avatar_url = avatar
         n = random.randint(*sign_gold)
         account.sign_in = today
-        GOLD.deal(session, account, n)
+        GOLD.deal(account, n, session)
         session.commit()
     return random.choice(["祝你好运~", "可别花光了哦~"]) + f"\n你获得了 {n} {GOLD.name}"
 
@@ -137,7 +137,7 @@ async def _(event: Event):
         account = manager.account(event, session)
         if account is None:
             return "无法在当前会话创建账户。"
-        return f"你还有 {item.bank(session, account).n} 个{item.name}"
+        return f"你还有 {item.bank(account, session).n} 个{item.name}"
 
 
 @plugin.handle(["我的信息", "我的资料卡"], ["user_id", "group_id", "nickname"])
@@ -147,18 +147,18 @@ async def _(event: Event):
         if account is None:
             return "无法在当前会话创建账户。"
         marking_lines = [lucky_marking]
-        if REVOLUTION_MARKING.bank(session, account).n > 0:
+        if REVOLUTION_MARKING.bank(account, session).n > 0:
             marking_lines.append(revolution_marking)
-        if DEBUG_MARKING.bank(session, account).n > 0:
+        if DEBUG_MARKING.bank(account, session).n > 0:
             marking_lines.append(debug_marking)
         user = account.user
         avatar_url = user.avatar_url
         nickname = account.nickname
         dist_lines = []
-        dist: list[tuple[int, str]] = [((sum_std_n := STD_GOLD.bank(session, account).n), "个人账户")]
+        dist: list[tuple[int, str]] = [((sum_std_n := STD_GOLD.bank(account, session).n), "个人账户")]
         for _account in user.accounts:
             _group = _account.group
-            std_n = GOLD.bank(session, _account).n * _group.level
+            std_n = GOLD.bank(_account, session).n * _group.level
             if std_n > 0:
                 dist.append((std_n, _group.nickname))
             sum_std_n += std_n
@@ -169,7 +169,7 @@ async def _(event: Event):
             stock_value = "0"
         dist_lines.append(f"[font color=#0066CC]股票 {stock_value}")
         for marking_item in manager.marking_library.values():
-            if (n := marking_item.bank(session, account).n) > 0:
+            if (n := marking_item.bank(account, session).n) > 0:
                 dist_lines.append(f"[font color={marking_item.color}]Lv.{min(n, 99)}[pixel 160]{marking_item.tip}")
         message_lines = []
         if account.sign_in is None:
@@ -221,80 +221,6 @@ async def _(event: Event):
         return "您的仓库空空如也。"
 
 
-@plugin.handle(["群金库", "群仓库"], ["user_id", "group_id", "permission"], rule=Rule.group)
-async def _(event: Event):
-    if not (args := event.args_parse()):
-        return
-    command, n = args[:2]
-    group_id: str = event.group_id  # type: ignore
-    user_id = event.user_id
-    if command == "查看":
-        with manager.db.session as session:
-            group = session.get(Group, group_id)
-            if group is None:
-                return "群组不存在。"
-            item_data, stock_data = manager.bank_data(group.bank, session)
-            imagelist: ImageList = []
-            if item_data:
-                if len(item_data) < 6:
-                    imagelist.extend(item_info(item_data))
-                else:
-                    imagelist.append(card_template(item_card(item_data), "群仓库"))
-            if stock_data:
-                imagelist.append(card_template(stock_card(stock_data), "群投资"))
-        return manager.info_card(imagelist, user_id) if imagelist else "群金库是空的"
-    sign, name = command[0], command[1:]
-    match sign:
-        case "存":
-            sign = 1
-        case "取":
-            sign = -1
-        case _:
-            return
-    if n < 0:
-        n = -n
-        sign = -sign
-
-    with manager.db.session as session:
-        if item := manager.items_library.get(name):
-            item_id = item.id
-            item_name = item.name
-            account = manager.db.account(user_id, group_id, session)
-            bank = item.bank(session, account)
-        elif stock := Stock.find(name, session):
-            item_id = stock.id
-            item_name = stock.name
-            bank = session.exec(UserBank.select().where(UserBank.item_id == item_id, UserBank.bound_id == user_id)).first()
-            bank = bank or UserBank(item_id=item_id, bound_id=user_id)
-        else:
-            return f"没有名为 {name} 的道具或股票。"
-        if sign == 1:
-            if bank.n < n:
-                return f"你没有足够的{item_name}（{bank.n}）"
-            group_bank = session.exec(GroupBank.select().where(GroupBank.item_id == item_id, GroupBank.bound_id == group_id)).first()
-            group_bank = group_bank or GroupBank(item_id=item_id, bound_id=group_id)
-            bank.n -= n
-            session.add(bank)
-            group_bank.n += n
-            session.add(group_bank)
-            session.commit()
-            return f"你在群仓库存入了{n}个{item_name}"
-        else:
-            if not Rule.group_admin(event):
-                return f"你的权限不足。"
-            group_bank = session.exec(GroupBank.select().where(GroupBank.item_id == item_id, GroupBank.bound_id == group_id)).first()
-            if group_bank is None:
-                return f"群仓库没有足够的{item_name}（0）"
-            if group_bank.n < n:
-                return f"群仓库没有足够的{item_name}（{group_bank.n}）"
-            group_bank.n -= n
-            session.add(group_bank)
-            bank.n += n
-            session.add(bank)
-            session.commit()
-            return f"你在群仓库取出了{n}个{item_name}"
-
-
 @plugin.handle(["群资料卡"], ["user_id", "group_id", "nickname", "group_avatar"])
 async def _(event: Event):
     """
@@ -305,7 +231,7 @@ async def _(event: Event):
         if group_name:
             if (stock := Stock.find(group_name, session)) is not None:
                 group = stock.group
-            elif (group := Group.find(group_name, session) or session.get(Group, group_name)) is None:
+            elif (group := session.get(Group, group_name) or Group.find(group_name, session)) is None:
                 return f"未找到【{group_name}】"
         else:
             group_id = event.group_id
@@ -359,12 +285,11 @@ async def _(event: Event):
     item = manager.items_library.get(name)
     if not item:
         return f"没有【{name}】这种道具。"
-
     with manager.db.session as session:
         account = manager.account(event, session)
         if account is None:
             return "无法在当前会话创建账户。"
-        if (n := item.deal(session, account, N)) is None:
+        if (n := item.deal(account, N, session)) is None:
             session.commit()
             return f"你获得了{N}个【{item.name}】！"
         return f"获取失败，你的【{item.name}】（{n}）数量不足。"
@@ -386,7 +311,7 @@ async def _(event: Event):
         return
     user_id = event.user_id
     with manager.db.session as session:
-        account = session.exec(Account.select().where(Account.user_id == user_id, Account.group_id == group_id)).first()
+        account = session.exec(Account.select().where(Account.user_id == user_id, Account.group_id == group_id)).one_or_none()
         if account is None:
             return "目标账户不存在。"
         account_id = account.id

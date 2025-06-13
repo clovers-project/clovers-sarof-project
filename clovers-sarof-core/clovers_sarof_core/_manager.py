@@ -103,10 +103,10 @@ class Manager:
             return False, f"数量不能小于1。"
         sender_account = self.db.account(sender_id, group_id, session)
         sender_name = sender_account.name or sender_account.user.name or sender_account.user_id
-        if (n := item.deal(session, sender_account, -unsettled)) is not None:
+        if (n := item.deal(sender_account, -unsettled, session)) is not None:
             return False, f"数量不足。\n——{sender_name}还有{n}个{item.name}。"
         receiver_account = self.db.account(receiver_id, group_id, session)
-        item.deal(session, receiver_account, unsettled)
+        item.deal(receiver_account, unsettled, session)
         session.commit()
         receiver_name = receiver_account.name or receiver_account.user.name or receiver_account.user_id
         return True, f"{sender_name} 向 {receiver_name} 赠送了{unsettled}个{item.name}"
@@ -121,7 +121,8 @@ class Manager:
         if group is None:
             return wealths
         if item.domain == 2:
-            query = AccountBank.select().join(Account).where(AccountBank.item_id == item_id, Account.group_id == group.id)
+            group_id = group.id
+            query = AccountBank.select().join(Account).where(AccountBank.item_id == item_id, Account.group_id == group_id)
             wealths.extend(b.n for b in session.exec(query).all())
         group_bank = group.item(item_id, session).first()
         if group_bank is not None:
