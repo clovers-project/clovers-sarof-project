@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, TypeVar, Type
+from typing import Any, ClassVar
 from datetime import datetime
 from sqlmodel import SQLModel as BaseSQLModel, Field, Relationship
 from sqlmodel import Session, create_engine, select
@@ -57,7 +57,7 @@ class Exchange(BaseBank, table=True):
     quote: float = 0.0
 
 
-class Stock(Entity[Exchange], table=True):
+class Stock(Entity, table=True):
     BankType = Exchange
     exchange: list[Exchange] = Relationship(back_populates="stock", cascade_delete=True)
     # relation
