@@ -1,4 +1,4 @@
-from typing import Any, get_args
+from typing import Any, ClassVar, TypeVar, Type
 from datetime import datetime
 from sqlmodel import SQLModel as BaseSQLModel, Field, Relationship
 from sqlmodel import Session, create_engine, select
@@ -33,14 +33,9 @@ class BaseBank(SQLModel):
         return select(cls).where(cls.bound_id == bound_id, cls.item_id == item_id)
 
 
-class Entity[Bank: BaseBank](BaseItem):
+class Entity(BaseItem):
     name: str
-
-    def __init_subclass__(cls, **kwargs):
-        if (type_args := get_args(cls)) and issubclass((BankModel := type_args[0]), BaseBank):
-            cls.BankModel: type[Bank] = BankModel  # type: ignore # 这里的类型是 get_args(cls) 提取的，所以肯定是 type[Bank]
-            return super().__init_subclass__(**kwargs)
-        raise TypeError(f"Class {cls.__name__} must be parameterized with a concrete BaseBank.")
+    BankType: ClassVar[type[BaseBank]]
 
     def cancel(self, session: Session):
         if (obj := session.get(type(self), self.id)) is None:
@@ -49,7 +44,7 @@ class Entity[Bank: BaseBank](BaseItem):
         session.commit()
 
     def item(self, item_id: str, session: Session):
-        return session.exec(self.BankModel.select_item(bound_id=self.id, item_id=item_id))
+        return session.exec(self.BankType.select_item(bound_id=self.id, item_id=item_id))
 
 
 class Exchange(BaseBank, table=True):
@@ -63,6 +58,7 @@ class Exchange(BaseBank, table=True):
 
 
 class Stock(Entity[Exchange], table=True):
+    BankType = Exchange
     exchange: list[Exchange] = Relationship(back_populates="stock", cascade_delete=True)
     # relation
     group: "Group" = Relationship(back_populates="stock")
@@ -84,9 +80,10 @@ class AccountBank(BaseBank, table=True):
     bound_id: int = Field(foreign_key="account.id")
 
 
-class Account(Entity[AccountBank], table=True):
+class Account(Entity, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    bank: list["AccountBank"] = Relationship(back_populates="account", cascade_delete=True)
+    BankType = AccountBank
+    bank: list[AccountBank] = Relationship(back_populates="account", cascade_delete=True)
     # relation
     user: "User" = Relationship(back_populates="accounts")
     user_id: str = Field(foreign_key="user.id", index=True)
@@ -106,7 +103,8 @@ class UserBank(BaseBank, table=True):
     bound_id: str = Field(foreign_key="user.id")
 
 
-class User(Entity[UserBank], table=True):
+class User(Entity, table=True):
+    BankType = UserBank
     bank: list[UserBank] = Relationship(back_populates="user", cascade_delete=True)
     # relation
     accounts: list[Account] = Relationship(back_populates="user", cascade_delete=True)
@@ -127,7 +125,8 @@ class GroupBank(BaseBank, table=True):
     bound_id: str = Field(foreign_key="group.id")
 
 
-class Group(Entity[GroupBank], table=True):
+class Group(Entity, table=True):
+    BankType = GroupBank
     bank: list[GroupBank] = Relationship(back_populates="group", cascade_delete=True)
     # relation
     accounts: list[Account] = Relationship(back_populates="group", cascade_delete=True)
@@ -252,7 +251,7 @@ class Item:
         bank = self.bank(session, account)
         return self.bank_deal(session, bank, unsettled)
 
-    def bank(self, session: Session, account: Account) -> AccountBank | UserBank:
+    def bank(self, session: Session, account: Account) -> BaseBank:
         raise NotImplementedError
 
     def account_bank(self, session: Session, account: Account):

@@ -4,7 +4,6 @@ import math
 import random
 from io import BytesIO
 from collections import Counter
-from typing import cast
 from clovers_apscheduler import scheduler
 from clovers.logger import logger
 from clovers_sarof_core import __plugin__ as plugin, Event, Rule
@@ -41,7 +40,7 @@ company_public_gold = __config__.company_public_gold
 
 @plugin.handle(["发起重置"], ["group_id"], rule=Rule.group)
 async def _(event: Event):
-    group_id = cast(str, event.group_id)
+    group_id: str = event.group_id  # type: ignore
     with manager.db.session as session:
         group = session.get(Group, group_id)
         if group is None:
@@ -52,53 +51,42 @@ async def _(event: Event):
             .where(
                 Account.group_id == group.id,
                 AccountBank.item_id == GOLD.id,
-                AccountBank.n > 0,
+                AccountBank.n > gini_filter_gold,
             )
         ).all()
-
-    ranklist: list[tuple[Account, int]] = []
-    sum_wealths = 0
-    for account_id in group.accounts_map.values():
-        account = manager.data.account_dict[account_id]
-        n = account.bank[GOLD.id]
-        if account.bank[GOLD.id] >= gini_filter_gold:
-            ranklist.append((account, n))
-        sum_wealths += n
-    if sum_wealths < company_public_gold:
-        return f"本群金币（{sum_wealths}）小于{company_public_gold}，未满足重置条件。"
-    gini = gini_coef([x[1] for x in ranklist])
-    if gini < revolt_gini:
-        return f"当前基尼系数为{round(gini,3)}，未满足重置条件。"
-    ranklist = heapq.nlargest(10, ranklist, key=lambda x: x[1])
-    top = ranklist[0][0]
-    REVOLUTION_MARKING.locate_bank(*manager.locate_account(top.user_id, group_id))[REVOLUTION_MARKING.id] += 1
-    group.extra["revolution_time"] = time.time()
-    revolution_achieve: dict = group.extra.setdefault("revolution_achieve", {})
-    revolution_achieve[top.user_id] = revolution_achieve.get(top.user_id, 0) + 1
-    for i, (account, n) in enumerate(ranklist):
-        account.bank[GOLD.id] = int(n * i / 10)
-    for account_id in group.accounts_map.values():
-        manager.data.account_dict[account_id].extra["revolution"] = False
-    rate = group.level / group.level + 1
-    for prop_id, n in group.bank.items():
-        prop = manager.props_library[prop_id]
-        if prop.domain == 1:
-            group.bank[prop_id] = int(n * rate)
-    group.level += 1
-    return f"当前系数为：{round(gini,3)}，重置成功！恭喜{top.name}进入挂件榜☆！重置签到已刷新。"
+        wealths = [x.n for x in banks]
+        if (sum_wealths := sum(wealths)) < company_public_gold:
+            return f"本群金币（{sum_wealths}）小于{company_public_gold}，未满足重置条件。"
+        if (gini := gini_coef(wealths)) < revolt_gini:
+            return f"当前基尼系数为{gini:f3}，未满足重置条件。"
+        ranklist = heapq.nlargest(10, banks, key=lambda x: x.n)
+        top = ranklist[0]
+        REVOLUTION_MARKING.deal(session, top.account, 1)
+        for i, bank in enumerate(ranklist):
+            bank.n = int(bank.n * i / 10)
+            bank.account.extra["revolution"] = False
+        rate = group.level / group.level + 1
+        for bank in group.bank:
+            if manager.items_library[bank.item_id].domain == 1:
+                bank.n = int(bank.n * rate)
+        group.level += 1
+        session.commit()
+        return f"当前系数为：{gini:f3}，重置成功！恭喜{top.account.nickname}进入挂件榜☆！重置签到已刷新。"
 
 
 @plugin.handle(["重置签到", "领取金币"], ["user_id", "group_id", "nickname", "avatar"])
 async def _(event: Event):
-    user, account = manager.account(event)
-    if avatar := event.avatar:
-        user.avatar_url = avatar
-    extra = account.extra
-    if not extra.setdefault("revolution", True):
-        return "你没有待领取的金币"
-    n = random.randint(*revolt_gold)
-    GOLD.deal(account.bank, n)
-    extra["revolution"] = False
+    with manager.db.session as session:
+        account = manager.account(event, session)
+        if account is None:
+            return "无法在当前会话创建账户。"
+        if avatar_url := event.avatar:
+            account.user.avatar_url = avatar_url
+        if not account.extra.setdefault("revolution", True):
+            return "你没有待领取的金币"
+        n = random.randint(*revolt_gold)
+        GOLD.deal(session, account, n)
+        account.extra["revolution"] = False
     return f"这是你重置后获得的金币！你获得了 {n} 金币"
 
 

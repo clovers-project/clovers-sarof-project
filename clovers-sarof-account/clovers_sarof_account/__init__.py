@@ -2,7 +2,6 @@ import random
 from datetime import datetime
 from PIL import ImageColor
 from linecard import ImageList
-from typing import cast
 from clovers import TempHandle
 from clovers.config import Config as CloversConfig
 from clovers_sarof_core import __plugin__ as plugin, Event, Rule
@@ -96,7 +95,7 @@ async def _(event: Event):
 
 @plugin.handle(["发红包"], ["user_id", "group_id", "at", "permission"], rule=[Rule.at, Rule.group])
 async def _(event: Event):
-    group_id = cast(str, event.group_id)
+    group_id: str = event.group_id  # type: ignore
     unsettled = event.args_to_int()
     sender_id = event.user_id
     receiver_id = event.at[0]
@@ -111,7 +110,7 @@ async def _(event: Event):
 
 @plugin.handle(["送道具"], ["user_id", "group_id", "at", "permission"], rule=[Rule.at, Rule.group])
 async def _(event: Event):
-    group_id = cast(str, event.group_id)
+    group_id: str = event.group_id  # type: ignore
     if not (args := event.args_parse()):
         return
     item_name, unsettled = args[:2]
@@ -227,7 +226,7 @@ async def _(event: Event):
     if not (args := event.args_parse()):
         return
     command, n = args[:2]
-    group_id = cast(str, event.group_id)
+    group_id: str = event.group_id  # type: ignore
     user_id = event.user_id
     if command == "查看":
         with manager.db.session as session:

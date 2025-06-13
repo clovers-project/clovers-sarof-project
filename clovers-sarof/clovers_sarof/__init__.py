@@ -1,0 +1,1 @@
+from clovers_sarof_core import __plugin__
