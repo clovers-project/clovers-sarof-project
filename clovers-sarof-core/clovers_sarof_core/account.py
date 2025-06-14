@@ -88,14 +88,18 @@ class Exchange(BaseBank, table=True):
 
     def deal(self, unsettled: int, session: Session):
         time_log = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        if unsettled < self.n:
-            self.user.post_message(f"【{time_log}】卖出 {self.stock.name}*{unsettled} 收入 {unsettled * self.quote}")
-            self.n -= unsettled
-            return 0
-        else:
-            self.user.post_message(f"【{time_log}】卖出 {self.stock.name}*{self.n} 收入 {self.n * self.quote}")
+        settle = min(self.n, unsettled)
+        self.user.post_message(f"【{time_log}】卖出 {self.stock.name}*{settle}")
+        self.n -= settle
+        if self.n <= 0:
             session.delete(self)
-            return unsettled - self.n
+        # 理论上用户存在库存且数量应大于等于 settle
+        # 但为了健壮性这里做冗余处理
+        bank = self.user.item(self.bound_id, session).one_or_none()
+        if bank is not None:
+            if self.stock.bank_deal(bank, -settle, session) is not None:
+                session.delete(bank)
+        return unsettled - settle
 
 
 class Stock(BaseItem, Entity, table=True):

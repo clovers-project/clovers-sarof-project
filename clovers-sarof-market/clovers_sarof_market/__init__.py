@@ -4,7 +4,6 @@ import math
 import random
 import asyncio
 from io import BytesIO
-from collections import Counter
 from linecard import ImageList
 from clovers import TempHandle
 from clovers.logger import logger
@@ -14,15 +13,7 @@ from clovers_sarof_core import __plugin__ as plugin, Event, Rule
 from clovers_sarof_core import manager, client
 from clovers_sarof_core import GOLD, STD_GOLD, REVOLUTION_MARKING
 from clovers_sarof_core.account import Stock, Account, User, Group, Exchange, AccountBank, UserBank, GroupBank
-from clovers_sarof_core.linecard import (
-    card_template,
-    avatar_list,
-    item_info,
-    item_card,
-    stock_card,
-    candlestick,
-    dist_card,
-)
+from clovers_sarof_core.linecard import card_template, avatar_list, item_info, item_card, stock_card
 from clovers_sarof_core.tools import format_number, to_int, download_url
 from .tools import gini_coef, item_name_rule
 from .config import Config
@@ -480,79 +471,72 @@ async def _(event: Event):
         return f"{deceased_name}已成功注销！但无任何可继承物品。"
 
 
-@plugin.handle(["刷新市场"], ["permission"], rule=Rule.superuser)
-@scheduler.scheduled_job("cron", minute="*/5", misfire_grace_time=120)
-async def _(*arg, **kwargs):
-    def stock_update(group: Group):
-        stock = group.stock
-        if not stock:
-            logger.info(f"{group.id} 更新失败")
-            return
-        level = group.level
-        # 资产更新
-        wealths = manager.group_wealths(group.id, GOLD.id)
-        stock_value = stock.value = sum(wealths) * level + group.bank[STD_GOLD.id]
-        floating = stock.floating
-        if not floating or math.isnan(floating):
-            stock.floating = float(stock_value)
-            logger.info(f"{stock.name} 已初始化")
-            return
-        # 股票价格变化：趋势性影响（正态分布），随机性影响（平均分布），向债务价值回归
-        floating += floating * random.gauss(0, 0.03)
-        floating += stock_value * random.uniform(-0.1, 0.1)
-        floating += (stock_value - floating) * 0.05
-        # 股票浮动收入
-        group.bank[GOLD.id] = int(wealths[-1] * floating / stock.floating)
-        # 结算交易市场上的股票
-        issuance = stock.issuance
-        std_value = 0
-        now_time = time.time()
-        clock = time.strftime("%H:%M", time.localtime(now_time))
-        for user_id, exchange in stock.exchange.items():
-            user = manager.data.user(user_id)
-            n, quote = exchange
-            value = 0.0
-            settle = 0
-            if quote:
-                for _ in range(n):
-                    unit = floating / issuance
-                    if unit < quote:
-                        break
-                    value += quote
-                    floating -= quote
-                    settle += 1
-            else:
-                for _ in range(n):
-                    unit = max(floating / issuance, 0.0)
-                    value += unit
-                    floating -= unit
-                settle = n
-            if settle == 0:
+def stock_update():
+    with manager.db.session as session:
+        stocks = session.exec(Stock.select()).all()
+        for stock in stocks:
+            wealths = manager.group_wealths(stock.group_id, GOLD.id, session)
+            level = stock.group.level
+            stock_value = sum(wealths) * level
+            std_bank = session.exec(GroupBank.select_item(stock.group_id, STD_GOLD.id)).one_or_none()
+            if std_bank:
+                stock_value += std_bank.n
+            stock.value = stock_value
+            floating = stock.floating
+            if math.isnan(floating):
+                stock.floating = float(stock_value)
+                logger.info(f"{stock.name} 已初始化")
                 continue
-            elif settle < n:
-                stock.exchange[user_id] = (n - settle, quote)
-            else:
-                stock.exchange[user_id] = (0, 0)
-            user.invest[stock.id] -= settle
-            group.invest[stock.id] += settle
-            int_value = int(value)
-            user.bank[STD_GOLD.id] += int_value
-            user.message.append(
-                f"【交易市场 {clock}】收入{int_value}标准金币。\n{stock.name}已出售{settle}/{n}，报价{quote or format_number(value/settle)}。"
-            )
-            std_value += value
-        group.bank[GOLD.id] -= int(std_value / level)
-        stock.exchange = {user_id: exchange for user_id, exchange in stock.exchange.items() if exchange[0] > 0}
-        # 更新浮动价格
-        stock.floating = floating
-        # 记录价格历史
-        if not (stock_record := group.extra.get("stock_record")):
-            stock_record = [(0.0, 0.0) for _ in range(720)]
-        stock_record.append((now_time, floating / issuance))
-        stock_record = stock_record[-720:]
-        group.extra["stock_record"] = stock_record
-        logger.info(f"{stock.name} 更新成功！")
+            # 股票价格变化：趋势性影响（正态分布），随机性影响（平均分布），向债务价值回归
+            floating += floating * random.gauss(0, 0.03)
+            floating += stock_value * random.uniform(-0.1, 0.1)
+            floating += (stock_value - floating) * 0.05
+            # 结算交易市场上的股票
+            issuance = stock.issuance
+            for exchange in sorted(stock.exchange, key=lambda x: x.quote):
+                value = 0.0
+                settle = 0
+                user = exchange.user
+                if (quote := exchange.quote) > 0:
+                    for _ in range(exchange.n):
+                        unit = floating / issuance
+                        if unit < quote:
+                            exchange.n -= settle
+                            break
+                        value += quote
+                        floating -= quote
+                        settle += 1
+                else:
+                    settle = exchange.n
+                    for _ in range(exchange.n):
+                        unit = max(floating / issuance, 0.0)
+                        value += unit
+                        floating -= unit
+                if settle == 0:
+                    continue
+                exchange.deal(settle, session)
+                bank = user.item(stock.id, session).one_or_none()
+                value = int(value)
+                bank = user.item(STD_GOLD.id, session).one_or_none()
+                if bank is None:
+                    bank = UserBank(bound_id=user.id, item_id=STD_GOLD.id, n=value)
+                    session.add(bank)
+                else:
+                    bank.n += value
+                stock.floating = floating
+            # 记录价格历史
+            now_time = time.time()
+            if not (record := stock.extra.get("record")):
+                record = [(0.0, 0.0) for _ in range(720)]
+            record.append((now_time, floating / issuance))
+            record = record[-720:]
+            stock.extra["stock_record"] = record
+            logger.info(f"{stock.name} 更新成功！")
 
-    groups = (group for group in manager.data.group_dict.values() if group.stock and group.stock.issuance)
-    for group in groups:
-        stock_update(group)
+
+scheduler.add_job(stock_update, trigger="cron", minute="*/5", misfire_grace_time=120)
+
+
+@plugin.handle(["刷新市场"], ["permission"], rule=Rule.superuser)
+async def _(event: Event):
+    stock_update()
