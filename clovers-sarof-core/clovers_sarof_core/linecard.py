@@ -1,7 +1,8 @@
+from collections.abc import Iterable
 from datetime import datetime
 from io import BytesIO
 from PIL import Image, ImageDraw
-from linecard import Linecard
+from linecard import Linecard, ImageList
 from matplotlib.font_manager import FontProperties
 import matplotlib.pyplot as plt
 import mplfinance as mpf
@@ -14,6 +15,10 @@ from ._config import __config__
 linecard = Linecard(__config__.fontname, __config__.fallback_fonts, (30, 40, 60))
 plt.rcParams["font.family"] = FontProperties(fname=linecard.font_path).get_name()
 plt.rcParams["font.sans-serif"] = [FontProperties(fname=path).get_name() for path in linecard.fallback_paths]
+
+_ = linecard.get_font(linecard.font_path, 40)
+assert _ is not None
+FONT_DEFAULT, _ = _
 
 
 def text_to_image(text: str, font_size=40, width=880, **kwargs):
@@ -56,9 +61,8 @@ def item_card(data: list[tuple[Item, int]]):
 
 def stock_card(data: list[tuple[Stock, int]]):
     def result(stock: Stock, n: int):
-        issuance = stock.issuance
-        buy = format_number(max(stock.floating, stock.value) / issuance) if issuance else "未发行"
-        sell = format_number(stock.floating / issuance) if issuance else "未发行"
+        buy = format_number(stock.price)
+        sell = format_number(stock.value / stock.issuance) if stock.issuance else "--"
         return (
             f"[pixel 20]{stock.name}\n"
             f"[pixel 20][font color=black]数量 [font color={'green' if n else 'red'}]{n}"
@@ -83,16 +87,12 @@ def avatar_card(avatar: bytes | None, nickname: str, lines: list[str] | None = N
     draw.line(((300, 120), (860, 120)), fill="gray", width=4)
     if lines is None:
         return canvas
-
-    font = linecard.get_font(linecard.font_path, 40)
-    assert font is not None
-    font, _ = font
     for n, line in enumerate(lines):
-        draw.text((300, 140 + n * 50), "•", fill="gray", font=font)
-        draw.text((840, 140 + n * 50), "•", fill="gray", font=font)
+        draw.text((300, 140 + n * 50), "•", fill="gray", font=FONT_DEFAULT)
+        draw.text((840, 140 + n * 50), "•", fill="gray", font=FONT_DEFAULT)
         x = 340
         for char in line:
-            draw.text((x, 140 + n * 50), char, fill="gray", font=font)
+            draw.text((x, 140 + n * 50), char, fill="gray", font=FONT_DEFAULT)
             x += 40
     return canvas
 
@@ -188,3 +188,17 @@ def dist_card(
     canvas = Image.new("RGBA", (880, 340))
     canvas.paste(Image.open(output), (220, 0))
     return canvas
+
+
+CIRCLE_60_MASK = Image.new("RGBA", (60, 60), (255, 255, 255, 0))
+ImageDraw.Draw(CIRCLE_60_MASK).ellipse(((0, 0), (60, 60)), fill="black")
+
+
+def avatar_list(data: Iterable[tuple[bytes | None, str]]) -> ImageList:
+    image_list = []
+    for avatar, text in data:
+        canvas = linecard(f"[pixel 80]{text}", 40, width=880)
+        if avatar:
+            canvas.paste(Image.open(BytesIO(avatar)).resize((60, 60)), (5, 20), CIRCLE_60_MASK)
+        image_list.append(canvas)
+    return image_list

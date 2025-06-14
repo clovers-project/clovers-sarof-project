@@ -1,4 +1,4 @@
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast, Sequence
 from datetime import datetime
 from sqlmodel import SQLModel as BaseSQLModel, Field, Relationship
 from sqlmodel import Session, create_engine, select
@@ -86,6 +86,17 @@ class Exchange(BaseBank, table=True):
     #  data
     quote: float = 0.0
 
+    def deal(self, unsettled: int, session: Session):
+        time_log = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if unsettled < self.n:
+            self.user.post_message(f"【{time_log}】卖出 {self.stock.name}*{unsettled} 收入 {unsettled * self.quote}")
+            self.n -= unsettled
+            return 0
+        else:
+            self.user.post_message(f"【{time_log}】卖出 {self.stock.name}*{self.n} 收入 {self.n * self.quote}")
+            session.delete(self)
+            return unsettled - self.n
+
 
 class Stock(BaseItem, Entity, table=True):
     BankType = Exchange
@@ -110,6 +121,27 @@ class Stock(BaseItem, Entity, table=True):
 
     def bank(self, account: "Account", session: Session):
         return account.user.item(self.id, session).one_or_none() or UserBank(item_id=self.id, bound_id=account.user_id)
+
+    def market(self, session: Session, limit: float = 0):
+        if limit <= 0:
+            return cast(Sequence[Exchange], self.item(self.id, session).all())
+        else:
+            query = select(Exchange).where(
+                Exchange.bound_id == self.group_id,
+                Exchange.item_id == self.id,
+                Exchange.quote <= limit,
+                Exchange.quote > 0.0,
+            )
+            return session.exec(query).all()
+
+    @property
+    def price(self):
+        if self.issuance <= 0:
+            return 0.0
+        total_price = max(self.value, self.floating)
+        if total_price <= 0.0:
+            return 0.0
+        return total_price / self.issuance
 
 
 class AccountBank(BaseBank, table=True):

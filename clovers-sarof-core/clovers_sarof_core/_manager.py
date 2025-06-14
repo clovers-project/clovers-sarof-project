@@ -162,3 +162,12 @@ class Manager:
                 pass
         stocks = session.exec(Stock.select().where(Stock.id.in_(banks.keys()))).all()  # type: ignore
         return items, [(stock, banks.get(stock.id, 0)) for stock in stocks]
+
+    @staticmethod
+    def find_group(name: str, session: Session):
+        group = session.get(Group, name)
+        if group is not None:
+            return group
+        stock = Stock.find(name, session)
+        if stock is not None:
+            return stock.group

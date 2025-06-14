@@ -2,6 +2,7 @@ import time
 import heapq
 import math
 import random
+import asyncio
 from io import BytesIO
 from collections import Counter
 from linecard import ImageList
@@ -10,20 +11,19 @@ from clovers.logger import logger
 from clovers.config import Config as CloversConfig
 from clovers_apscheduler import scheduler
 from clovers_sarof_core import __plugin__ as plugin, Event, Rule
-from clovers_sarof_core import manager
-from clovers_sarof_core import GOLD, STD_GOLD, REVOLUTION_MARKING, DEBUG_MARKING
-from clovers_sarof_core.account import Stock, Account, Group, AccountBank, UserBank, GroupBank
+from clovers_sarof_core import manager, client
+from clovers_sarof_core import GOLD, STD_GOLD, REVOLUTION_MARKING
+from clovers_sarof_core.account import Stock, Account, User, Group, Exchange, AccountBank, UserBank, GroupBank
 from clovers_sarof_core.linecard import (
-    text_to_image,
     card_template,
-    avatar_card,
+    avatar_list,
     item_info,
     item_card,
     stock_card,
     candlestick,
     dist_card,
 )
-from clovers_sarof_core.tools import format_number, to_int
+from clovers_sarof_core.tools import format_number, to_int, download_url
 from .tools import gini_coef, item_name_rule
 from .config import Config
 
@@ -286,61 +286,83 @@ async def _(event: Event):
 async def _(event: Event):
     if not (args := event.args_parse()):
         return
-    stock_name, buy, limit = args
+    stock_name, buy_count, limit = args
     with manager.db.session as session:
         if (stock := Stock.find(stock_name, session)) is None:
             return f"没有 {stock_name} 的注册信息"
-        buy_count = min
-
-    buy = min(stock_group.invest[stock.id], buy)
-    if buy < 1:
-        return "已售空，请等待结算。"
-    stock_level = stock_group.level
-    stock_value = sum(manager.group_wealths(stock.id, GOLD.id)) * stock_level + stock_group.bank[STD_GOLD.id]
-    user, account = manager.account(event)
-    group = manager.data.group(account.group_id)
-    level = group.level
-    account_STD_GOLD = account.bank[GOLD.id] * level
-    my_STD_GOLD = user.bank[STD_GOLD.id] + account_STD_GOLD
-    issuance = stock.issuance
-    floating = stock.floating
-    limit = limit or float("inf")
-    value = 0.0
-    _buy = 0
-    for _ in range(buy):
-        unit = max(floating, stock_value) / issuance
-        if unit > limit:
-            tip = f"价格超过限制（{limit}）。"
-            break
-        value += unit
-        if value > my_STD_GOLD:
-            value -= unit
-            tip = f"你的金币不足（{my_STD_GOLD}）。"
-            break
-        floating += unit
-        _buy += 1
-    else:
-        tip = "交易成功！"
-
-    int_value = math.ceil(value)
-    user.bank[STD_GOLD.id] -= int_value
-    if (n := user.bank[STD_GOLD.id]) < 0:
-        user.bank[STD_GOLD.id] = 0
-        account_STD_GOLD += n
-        account.bank[GOLD.id] = math.ceil(account_STD_GOLD / level)
-        user.add_message(f"购买{_buy}份{stock_name}需要花费{int_value}枚标准金币，其中{-n}枚来自购买群账户，汇率（{level}）")
-    user.invest[stock.id] += _buy
-    stock_group.bank[GOLD.id] += math.ceil(value / stock_level)
-    group.invest[stock.id] -= _buy
-    stock.floating = floating
-    stock.value = stock_value + int_value
-    output = BytesIO()
-    text_to_image(
-        f"{stock.name}\n----\n数量：{_buy}\n单价：{round(value/_buy,2)}\n总计：{int_value}" + endline(tip),
-        width=440,
-        bg_color="white",
-    ).save(output, format="png")
-    return output
+        account = manager.account(event, session)
+        if account is None:
+            return "无法在当前会话创建账户。"
+        group_bank = stock.group.item(stock.id, session).one_or_none()
+        if (group_bank is None or group_bank.n <= 0) and not (market := stock.market(session, limit)):
+            return "没有符合要求的出售信息"
+        market = sorted(market, key=lambda exchange: exchange.quote)
+        level = account.group.level
+        my_std_bank = STD_GOLD.bank(account, session)
+        my_gold_bank = GOLD.bank(account, session)
+        std_total = my_std_bank.n + my_gold_bank.n * level
+        std_cost = 0
+        buy_n = 0
+        quote_current: float = 0
+        for exchange in market:
+            _buy = (std_total - std_cost) / exchange.quote
+            if _buy >= exchange.n:
+                buy_n += exchange.n
+                quote_current = exchange.quote
+                std_gold_n = int(exchange.n * quote_current)
+                buy_count = exchange.deal(buy_count, session)
+                bank = exchange.user.item(STD_GOLD.id, session).one_or_none() or UserBank(item_id=STD_GOLD.id, bound_id=exchange.user_id)
+                bank.n += std_gold_n
+                std_cost += std_gold_n
+                session.add(bank)
+            else:
+                exchange_n = int(_buy)
+                buy_n += exchange_n
+                quote_current = exchange.quote
+                std_gold_n = int(exchange_n * quote_current)
+                exchange.deal(exchange_n, session)
+                bank = exchange.user.item(STD_GOLD.id, session).one_or_none() or UserBank(item_id=STD_GOLD.id, bound_id=exchange.user_id)
+                bank.n += std_gold_n
+                std_cost += std_gold_n
+                session.add(bank)
+                break
+            if buy_count <= 0:
+                break
+        else:
+            if group_bank is not None and buy_count > 0 and (price := stock.price) > 0:
+                growth_rate = 1 / stock.issuance
+                for _ in range(buy_count):
+                    quote_current = max(quote_current, price)
+                    std_cost += quote_current
+                    if std_cost > std_total:
+                        std_cost -= quote_current
+                        break
+                    price += price * growth_rate
+                    buy_n += 1
+        std_cost = math.ceil(std_cost)
+        tip = f"【购买:{stock_name}】使用了 {std_cost} 枚 {STD_GOLD.name}"
+        if std_cost < my_std_bank.n:
+            my_std_bank.n -= std_cost
+            session.add(my_std_bank)
+        else:
+            std_cost -= my_std_bank.n
+            if _bank := session.get(UserBank, STD_GOLD.id):
+                session.delete(_bank)
+            if std_cost > 0:
+                my_gold_bank.n -= math.ceil(std_cost / level)
+                session.add(my_gold_bank)
+                tip += f"，其中{std_cost}枚来自购买群账户，汇率（{level}）"
+        account.user.post_message(tip)
+        session.commit()
+    if buy_n > 0:
+        card_template(
+            f"{stock_name}\n----\n数量：{buy_n}\n单价：{buy_n / std_cost :2f}\n总计：{std_cost}",
+            "购买信息",
+            bg_color="white",
+            width=440,
+        ).save((output := BytesIO()), format="png")
+        return output
+    return "你没有足够的金币"
 
 
 @plugin.handle(["出售", "卖出", "结算"], ["user_id"])
@@ -348,41 +370,64 @@ async def _(event: Event):
     if not (args := event.args_parse()):
         return
     stock_name, n, quote = args
-    user = manager.data.user(event.user_id)
-    stock_group = manager.group_library.get(stock_name)
-    if not stock_group or not (stock := stock_group.stock):
-        return f"没有 {stock_name} 的注册信息"
-    stock_name = stock_group.nickname
-    my_stock = min(user.invest[stock.id], n)
-    user_id = user.id
-    exchange = stock.exchange
-    if my_stock < 1:
-        if user_id in exchange:
-            del exchange[user_id]
-            return "交易信息已注销。"
+    with manager.db.session as session:
+        if (stock := Stock.find(stock_name, session)) is None:
+            return f"没有 {stock_name} 的注册信息"
+        account = manager.account(event, session)
+        if account is None:
+            return "无法在当前会话创建账户。"
+        query = Exchange.select_item(stock.id, stock.id).join(User).where(User.id == account.user_id)
+        exchange = session.exec(query).one_or_none()
+        if n <= 0:
+            if exchange is None:
+                return "没有交易信息。"
+            else:
+                session.delete(exchange)
+                return "交易信息已注销。"
+        if exchange is None:
+            exchange = Exchange(
+                item_id=stock.id,
+                bound_id=stock.id,
+                user_id=account.user_id,
+                n=n,
+                quote=quote,
+            )
+            session.add(exchange)
+            tip = "交易信息发布成功！"
         else:
-            return "交易信息无效。"
-    if user_id in exchange:
-        tip = "交易信息已修改。"
-    else:
-        tip = "交易信息发布成功！"
-    exchange[user_id] = (n, quote or 0.0)
-    output = BytesIO()
-    text_to_image(
-        f"{stock_name}\n----\n报价：{quote or '自动出售'}\n数量：{n}" + endline(tip),
-        width=440,
+            exchange.n = n
+            exchange.quote = quote
+            tip = "交易信息已修改。"
+        session.commit()
+    card_template(
+        f"{stock_name}\n----\n报价：{quote or '自动出售'}\n数量：{n}",
+        tip,
         bg_color="white",
-    ).save(output, format="png")
+        width=440,
+    ).save((output := BytesIO()), format="png")
     return output
 
 
 @plugin.handle(["市场信息"], ["user_id"])
 async def _(event: Event):
-    data = [(stock, group.invest[stock.id]) for group in manager.data.group_dict.values() if (stock := group.stock)]
-    if not data:
-        return "市场为空"
-    data.sort(key=lambda x: x[0].value, reverse=True)
-    return manager.info_card([invest_card(data)], event.user_id)
+    if stock_name := event.message:
+        with manager.db.session as session:
+            if (stock := Stock.find(stock_name, session)) is None:
+                return f"没有 {stock_name} 的注册信息"
+            exchanges = stock.market(session)
+            exchanges = heapq.nsmallest(20, exchanges, key=lambda x: x.quote)
+            avatar_urls, infos = zip(*((e.user.avatar_url, f"报价：{e.quote}[pixel 580]数量：{e.n}") for e in exchanges))
+        avatars = await asyncio.gather(*(download_url(avatar, client) for avatar in avatar_urls))
+        imagelist = avatar_list(zip(avatars, infos))
+    else:
+        with manager.db.session as session:
+            all_stocks = session.exec(Stock.select()).all()
+            data = [(stock, bank.n) for stock in all_stocks if (bank := stock.group.item(stock.id, session).one_or_none())]
+        if not data:
+            return "市场为空"
+        data.sort(key=lambda x: x[0].value, reverse=True)
+        imagelist = [card_template(stock_card(data), "市场信息")]
+    return manager.info_card(imagelist, event.user_id)
 
 
 @plugin.handle(["继承公司账户", "继承群账户"], ["user_id", "permission"], rule=Rule.superuser)
@@ -392,47 +437,47 @@ async def _(event: Event):
         return
     arrow = args[1]
     if arrow == "->":
-        deceased = args[0]
-        heir = args[2]
+        deceased_name = args[0]
+        heir_name = args[2]
     elif arrow == "<-":
-        heir = args[0]
-        deceased = args[2]
+        heir_name = args[0]
+        deceased_name = args[2]
     else:
         return "请输入:被继承群 -> 继承群"
-    deceased_group = manager.group_library.get(deceased)
-    if not deceased_group:
-        return f"被继承群:{deceased} 不存在"
-    heir_group = manager.group_library.get(heir)
-    if not heir_group:
-        return f"继承群:{heir} 不存在"
-    if deceased_group is heir_group:
-        return "无法继承自身"
-    ExRate = deceased_group.level / heir_group.level
-    # 继承群金库
-    invest_group = Counter(deceased_group.invest)
-    heir_group.invest = Counter(heir_group.invest) + invest_group
-    bank_group = Counter({k: int(v * ExRate) if manager.props_library[k].domain == 1 else v for k, v in deceased_group.bank.items()})
-    heir_group.bank = Counter(heir_group.bank) + bank_group
-    # 继承群员账户
-    all_bank_private = Counter()
-    for deceased_user_id, deceased_account_id in deceased_group.accounts_map.items():
-        deceased_account = manager.data.account_dict[deceased_account_id]
-        bank = Counter({k: int(v * ExRate) for k, v in deceased_account.bank.items()})
-        if deceased_user_id in heir_group.accounts_map:
-            all_bank_private += bank
-            heir_account_id = heir_group.accounts_map[deceased_user_id]
-            heir_account = manager.data.account_dict[heir_account_id]
-            heir_account.bank = Counter(heir_account.bank) + bank
-        else:
-            bank_group += bank
-            heir_group.bank = Counter(heir_group.bank) + bank
-    del manager.group_library[deceased_group.id]
-    manager.data.cancel_group(deceased_group.id)
-    info = []
-    info.append(invest_card(manager.invest_data(invest_group), "群投资继承"))
-    info.append(prop_card(manager.props_data(bank_group), "群金库继承"))
-    info.append(prop_card(manager.props_data(all_bank_private), "个人总继承"))
-    return manager.info_card(info, event.user_id)
+
+    with manager.db.session as session:
+        if (deceased_group := manager.find_group(deceased_name, session)) is None:
+            return f"被继承群:{deceased_name} 不存在"
+        if (heir_group := manager.find_group(heir_name, session)) is None:
+            return f"被继承群:{deceased_name} 不存在"
+        if deceased_group is heir_group:
+            return "无法继承自身"
+        heir_group_id = heir_group.id
+        item_data, stock_data = manager.bank_data(deceased_group.bank, session)
+        ExRate = deceased_group.level / heir_group.level
+        imagelist = []
+        if item_data:
+            imagelist.append(card_template(item_card(item_data), "继承群仓库"))
+            for item, n in item_data:
+                heir_bank = session.exec(GroupBank.select_item(heir_group_id, item.id)).one_or_none()
+                if heir_bank is None:
+                    heir_bank = GroupBank(bound_id=heir_group_id, item_id=item.id)
+                    session.add(heir_bank)
+                heir_bank.n += int(ExRate * n) if item.domain == 1 else n
+        if stock_data:
+            imagelist.append(card_template(stock_card(stock_data), "继承群投资"))
+            for item, n in stock_data:
+                heir_bank = session.exec(GroupBank.select_item(heir_group_id, item.id)).one_or_none()
+                if heir_bank is None:
+                    heir_bank = GroupBank(bound_id=heir_group_id, item_id=item.id)
+                    session.add(heir_bank)
+                heir_bank.n += n
+        deceased_group.cancel(session)
+        session.commit()
+    if imagelist:
+        return manager.info_card(imagelist, event.user_id)
+    else:
+        return f"{deceased_name}已成功注销！但无任何可继承物品。"
 
 
 @plugin.handle(["刷新市场"], ["permission"], rule=Rule.superuser)
@@ -511,16 +556,3 @@ async def _(*arg, **kwargs):
     groups = (group for group in manager.data.group_dict.values() if group.stock and group.stock.issuance)
     for group in groups:
         stock_update(group)
-
-
-@plugin.handle(["市场浮动重置"], ["permission"], rule=Rule.superuser)
-async def _(event: Event):
-    groups = (group for group in manager.data.group_dict.values() if group.stock and group.stock.issuance)
-    for group in groups:
-        stock = group.stock
-        if not stock:
-            continue
-        wealths = manager.group_wealths(group.id, GOLD.id)
-        stock_value = stock.value = sum(wealths) * group.level + group.bank[STD_GOLD.id]
-        stock.floating = stock.value = stock_value
-    return "重置成功！"
