@@ -14,8 +14,8 @@ class SQLModel(BaseSQLModel):
 
 
 class BaseItem:
-    id: str = Field(primary_key=True)
-    name: str = Field(index=True)
+    id: str
+    name: str
 
     def deal(self, account: "Account", unsettled: int, session: Session):
         bank = self.bank(account, session)
@@ -43,15 +43,6 @@ class BaseItem:
         session.commit()
 
 
-class BaseSQLItem(SQLModel):
-    id: str = Field(primary_key=True)
-    name: str = Field(index=True)
-
-    @classmethod
-    def find(cls, name: str, session: Session):
-        return session.exec(select(cls).where(cls.name == name)).one_or_none()
-
-
 class BaseBank(SQLModel):
     id: int | None = Field(default=None, primary_key=True)
     item_id: str = Field(index=True)
@@ -63,8 +54,9 @@ class BaseBank(SQLModel):
         return select(cls).where(cls.bound_id == bound_id, cls.item_id == item_id)
 
 
-class Entity(BaseSQLItem):
-    name: str
+class Entity(SQLModel):
+    id: str = Field(primary_key=True)
+    name: str = Field(index=True)
     BankType: ClassVar[type[BaseBank]]
 
     def cancel(self, session: Session):
@@ -75,6 +67,10 @@ class Entity(BaseSQLItem):
 
     def item(self, item_id: str, session: Session):
         return session.exec(self.BankType.select_item(bound_id=self.id, item_id=item_id))
+
+    @classmethod
+    def find(cls, name: str, session: Session):
+        return session.exec(select(cls).where(cls.name == name)).one_or_none()
 
 
 class Exchange(BaseBank, table=True):
