@@ -1,5 +1,5 @@
 import numpy as np
-from clovers_leafgame.output import text_to_image, endline
+from clovers_sarof_core.linecard import card_template
 
 curve_fit = {
     1: lambda x: 0.4051548792879075 * np.log(1.5220797359057374 * x) + -0.0020201103448929322 * x + -1.0258025707645715,
@@ -45,4 +45,4 @@ def report_card(
         f"平均☆ {round(prop_star/(prop_n or 1),3)}[pixel 450]平均☆ {round(air_star/(air_n or 1),3)}\n"
         f"数据来源：{nickname}"
     )
-    return text_to_image("\n".join(title) + endline("抽卡报告"))
+    return card_template("\n".join(title), "抽卡报告")

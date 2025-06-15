@@ -1,27 +1,26 @@
 import random
 import asyncio
-import time
-from datetime import datetime, timedelta
 from collections import Counter
-from clovers import Plugin
-from clovers_leafgame.clovers import Event, Rule
-from clovers_leafgame.main import plugin, manager
-from clovers_leafgame.item import Prop, GOLD, STD_GOLD
-from clovers_leafgame.output import prop_card, bank_card
-
+from clovers import TempHandle
+from clovers.config import Config as CloversConfig
+from clovers_sarof_core import __plugin__ as plugin, Event, Rule
+from clovers_sarof_core import manager
+from clovers_sarof_core import GOLD, STD_GOLD
+from clovers_sarof_core.account import Session, Item, Stock, Account, AccountBank, UserBank
+from clovers_sarof_core.linecard import card_template, item_card
+from clovers_sarof_core.tools import format_number
 from .core import usage, gacha, AIR_PACK, RED_PACKET
-from .output import report_card
-
-from clovers.config import config as clovers_config
+from .image import report_card
 from .config import Config
 
-config_key = __package__
-config_data = Config.model_validate(clovers_config.get(config_key, {}))
-clovers_config[config_key] = config_data.model_dump()
+config_data = CloversConfig.environ().setdefault(__package__, {})
+__config__ = Config.model_validate(config_data)
+"""主配置类"""
+config_data.update(__config__.model_dump())
 
-gacha_gold = config_data.gacha_gold
-packet_gold = config_data.packet_gold
-luckey_min, luckey_max = config_data.luckey_coin
+gacha_gold = __config__.gacha_gold
+packet_gold = __config__.packet_gold
+luckey_min, luckey_max = __config__.luckey_coin
 ticket_price = gacha_gold * 50
 
 
@@ -35,268 +34,250 @@ async def _(event: Event):
     if not count:
         return
     count = 200 if count > 200 else 1 if count < 1 else count
-    gold = count * gacha_gold
-    user, account = manager.account(event)
-    if n := GOLD.deal(account.bank, -gold):
-        return f"{count}连抽卡需要{gold}金币，你的金币：{n}。"
-
-    prop_data: list[list[tuple[Prop, int]]] = [[], [], []]
-    report_data = {"prop_star": 0, "prop_n": 0, "air_star": 0, "air_n": 0}
-    for prop_id, n in Counter(gacha() for _ in range(count)).items():
-        prop = manager.props_library[prop_id]
-        prop_data[prop.domain].append((prop, n))
-        if prop.domain == 0:
-            star_key = "air_star"
-            n_key = "air_n"
+    cost_gold = count * gacha_gold
+    with manager.db.session as session:
+        account = manager.account(event, session)
+        if account is None:
+            return "无法在当前会话创建账户。"
+        if (tn := GOLD.deal(account, -cost_gold, session)) is not None:
+            return f"{count}连抽卡需要{cost_gold}金币，你的金币：{tn}。"
+        prop_data: list[list[tuple[Item, int]]] = [[], [], []]
+        report_data = {"prop_star": 0, "prop_n": 0, "air_star": 0, "air_n": 0}
+        for prop, n in Counter(gacha() for _ in range(count)).items():
+            prop_data[prop.domain].append((prop, n))
+            if prop.domain == 0:
+                star_key = "air_star"
+                n_key = "air_n"
+            else:
+                star_key = "prop_star"
+                n_key = "prop_n"
+                prop.deal(account, n, session)
+            report_data[star_key] += prop.rare * n
+            report_data[n_key] += n
+        if count < 10:
+            return "你获得了" + "\n".join(f"({prop.rare}☆){prop.name}:{n}个" for seg in prop_data for prop, n in seg)
         else:
-            star_key = "prop_star"
-            n_key = "prop_n"
-            prop.deal(prop.locate_bank(user, account), n)
-        report_data[star_key] += prop.rare * n
-        report_data[n_key] += n
-    if count < 10:
-        return "你获得了" + "\n".join(f"({prop.rare}☆){prop.name}:{n}个" for seg in prop_data for prop, n in seg)
-    else:
-        info = [report_card(account.name, **report_data)]
-        if report_data["prop_n"] == 0:
-            AIR_PACK.deal(user.bank, 1)
-            RED_PACKET.deal(account.bank, 10)
-            GOLD.deal(account.bank, gold)
-            info.append(prop_card([(AIR_PACK, 1), (GOLD, gold), (RED_PACKET, 10)], f"本次抽卡已免费"))
-        if data := prop_data[2]:
-            info.append(prop_card(data, "全局道具"))
-        if data := prop_data[1]:
-            info.append(prop_card(data, "群内道具"))
-        if data := prop_data[0]:
-            info.append(prop_card(data, "未获取"))
-
-    return manager.info_card(info, user.id)
+            info = [report_card(account.nickname, **report_data)]
+            if report_data["prop_n"] == 0:
+                AIR_PACK.deal(account, 1, session)
+                RED_PACKET.deal(account, 10, session)
+                GOLD.deal(account, cost_gold, session)
+                info.append(card_template(item_card([(AIR_PACK, 1), (GOLD, cost_gold), (RED_PACKET, 10)]), f"本次抽卡已免费"))
+            air_prop, local_prop, global_prop = prop_data
+            if global_prop:
+                info.append(card_template(item_card(global_prop), f"全局道具"))
+            if local_prop:
+                info.append(card_template(item_card(local_prop), f"群内道具"))
+            if air_prop:
+                info.append(card_template(item_card(air_prop), f"未获取"))
+        return manager.info_card(info, event.user_id)
 
 
-@usage("金币", ["user_id", "group_id", "nickname"])
-async def _(prop: Prop, event: Event, count: int, extra: str):
-    if n := prop.deal(prop.locate_bank(*manager.account(event)), -count):
-        return f"使用失败，你还有{n}枚金币。"
-    return f"你使用了{count}枚金币。"
+@usage("金币")
+def _(account: Account, session: Session, item: Item, count: int, extra: str):
+    return f"你使用了{count}枚{item.name}。"
 
 
-@usage("临时维护凭证", ["user_id", "group_id", "nickname"])
-async def _(prop: Prop, event: Event, count: int, extra: str):
-    bank = prop.locate_bank(*manager.account(event))
-    if prop.deal(bank, -1):
-        return f"使用失败，你未持有{prop.name}"
-    try:
-        exec(extra.strip())
-        return f"执行成功！"
-    except Exception as e:
-        prop.deal(bank, 1)
-        return str(e)
+@usage("测试金库")
+def _(account: Account, session: Session, item: Item, count: int, extra: str):
+    return f"你获得了{format_number(count * 1000000000)}金币，{format_number(count * 1000000)}钻石。祝你好运！"
 
 
-@usage("测试金库", ["user_id", "group_id", "nickname"])
-async def _(prop: Prop, event: Event, count: int, extra: str):
-    bank = prop.locate_bank(*manager.account(event))
-    if prop.deal(bank, -1):
-        return f"使用失败，你未持有{prop.name}"
-    return "你获得了10亿金币，100万钻石。祝你好运！"
+@usage("空气礼包")
+def _(account: Account, session: Session, item: Item, count: int, extra: str):
+    data = []
+    for air_item in manager.items_library.values():
+        if air_item.domain != 0:
+            continue
+        air_item.deal(account, count, session)
+        data.append((air_item, count))
+    return ["你获得了", manager.info_card([card_template(item_card(data), "空气礼包")], account.user_id)]
 
 
-@usage("空气礼包", ["user_id", "group_id", "nickname"])
-async def _(prop: Prop, event: Event, count: int, extra: str):
-    user, account = manager.account(event)
-    bank = prop.locate_bank(user, account)
-    if n := prop.deal(bank, -count):
-        return f"使用失败，你没有足够的{prop.name}（{n}）"
-    data = [(prop, count) for prop in manager.props_library.values() if prop.domain == 0]
-    bank += {prop.id: n for prop, n in data}
-    return ["你获得了", manager.info_card(bank_card(data), user.id)]
-
-
-@usage("随机红包", ["user_id", "group_id", "nickname"])
-async def _(prop: Prop, event: Event, count: int, extra: str):
-    user, account = manager.account(event)
-    bank = prop.locate_bank(user, account)
-    if n := prop.deal(bank, -count):
-        return f"使用失败，你没有足够的{prop.name}（{n}）"
+@usage("随机红包")
+def _(account: Account, session: Session, item: Item, count: int, extra: str):
     gold = random.randint(*packet_gold) * count
-    GOLD.deal(account.bank, gold)
+    GOLD.deal(account, gold, session)
     return f"你获得了{gold}金币。祝你好运~"
 
 
-@usage("重开券", ["user_id", "group_id", "nickname"])
-async def _(prop: Prop, event: Event, count: int, extra: str):
-    user, account = manager.account(event)
-    bank = prop.locate_bank(user, account)
-    if prop.deal(bank, -1):
-        return f"使用失败，你没有足够的{prop.name}"
-    if (n := account.bank[GOLD.id]) < 0:
-        std_n = n * manager.data.group(account.group_id).level
-        user.bank[STD_GOLD.id] += std_n
-        user.add_message(f"【{prop.name}】你在群内的欠款（{-std_n}枚标准金币）已转移到个人账户")
-    data = manager.props_data(bank)
-    manager.data.cancel_account(account.id)
-    return ["你在本群的账户已重置，祝你好运~", manager.info_card([prop_card(data, "账户已重置")], user.id)]
+@usage("重开券")
+def _(account: Account, session: Session, item: Item, count: int, extra: str):
+    account.cancel(session)
+    return "你在本群的账户已重置，祝你好运~"
 
 
-@usage("幸运硬币", ["user_id", "group_id", "nickname", "Bot_Nickname"])
-async def _(prop: Prop, event: Event, count: int, extra: str):
-    user, account = manager.account(event)
-    count = min(count, account.bank[GOLD.id])
+async def recv_red_packet(event: Event, handle: TempHandle):
+    handle.finish()
+    with manager.db.session as session:
+        account = manager.account(event, session)
+        if account is None:
+            return "领取失败...未找到你的账户。"
+        RED_PACKET.deal(account, 1, session)
+        return f"领取成功，你已获得1个{RED_PACKET.name}"
+
+
+@usage("幸运硬币", 1)
+def _(account: Account, session: Session, item: Item, count: int, extra: str):
+    info = []
+    bet_item = manager.items_library.get(extra.strip(), GOLD)
     if count < luckey_min:
-        return f"使用失败，{prop.name}最小赌注为{luckey_min}金币"
-    if count > luckey_max:
-        return f"使用失败，{prop.name}最大赌注为{luckey_max}金币"
-    bank = prop.locate_bank(user, account)
-    if prop.deal(bank, -1):
-        return f"使用失败，你没有足够的{prop.name}"
-    GOLD.deal(account.bank, -count)
+        count = luckey_min
+    elif count > luckey_max:
+        info.append(f"不要过于依赖幸运哦!\n已将数量调整为{luckey_max}个")
+        count = luckey_max
+    bank = bet_item.bank(account, session)
     if random.randint(0, 1) == 0:
-        GOLD.deal(account.bank, count * 2)
-        return f"你获得了{count}金币"
+        if bank.n == 0:
+            RED_PACKET.deal(account, 1, session)
+            info.append(f"结果是正面！\n但你未持有{bet_item.name}...\n送你1个『{RED_PACKET.name}』，祝你好运~")
+        else:
+            session.add(bank)
+            if bank.n < count:
+                count = bank.n
+                info.append(f"你没有足够数量的{bet_item.name}...\n已将数量调整为持有个数（{count}）")
+            bank.n += count
+            info.append(f"结果是正面！\n恭喜你获得了{count}个{bet_item.name}")
     else:
-        RED_PACKET.deal(RED_PACKET.locate_bank(user, account), 1)
-        return f"你失去了{count}金币。\n{event.Bot_Nickname}送你1个『随机红包』，祝你好运~"
+        if bank.n == 0:
+            info.append(f"结果是反面...\n但你未持有{bet_item.name}...\n逃过一劫了呢，祝你好运~")
+        elif bank.n < count:
+            count = bank.n
+            bank.n = 0
+            info.append(f"结果是反面...\n你没有足够数量的{bet_item.name}...\n全部拿出来吧！（{count}）")
+        else:
+            info.append(f"结果是反面...\n你你失去了{count}个{bet_item.name}...")
+            if random.randint(0, 1) == 0:
+                user_id = account.user_id
+                group_id = account.group_id
+                rule: list[Rule.Checker] = [Rule.identify(user_id, group_id), lambda event: event.message == "领取红包"]
+                plugin.temp_handle(["user_id", "group_id", "nickname"], rule=rule)(recv_red_packet)
+    session.commit()
+    return "\n".join(info)
 
 
-@usage("超级幸运硬币", ["user_id", "group_id", "nickname", "Bot_Nickname"])
-async def _(prop: Prop, event: Event, count: int, extra: str):
-    user, account = manager.account(event)
-    bank = prop.locate_bank(user, account)
-    if prop.deal(bank, -1):
-        return f"使用失败，你没有足够的{prop.name}"
-    gold = account.bank[GOLD.id]
-    if random.randint(0, 1) == 0:
-        account.bank[GOLD.id] *= 2
-        return f"你获得了{gold}金币"
-    else:
-        account.bank[GOLD.id] = 0
-        RED_PACKET.deal(RED_PACKET.locate_bank(user, account), 1)
-        return f"你失去了{gold}金币。\n{event.Bot_Nickname}送你1个『随机红包』，祝你好运~"
-
-
-@usage("道具兑换券", ["user_id", "group_id", "nickname"])
-async def _(prop: Prop, event: Event, count: int, extra: str):
+@usage("道具兑换券", 0)
+def _(account: Account, session: Session, item: Item, count: int, extra: str):
     if extra:
-        prop_name = extra.strip()
-        target_prop = manager.props_library.get(prop_name)
-        if not target_prop:
-            return f"不存在道具【{prop_name}】"
-        if target_prop.rare < 3:
-            return f"无法兑换【{target_prop.name}】"
+        item_name = extra.strip()
+        if (item_t := manager.items_library.get(item_name)) is None:
+            return f"不存在道具【{item_name}】"
+        if item_t.rare < 3:
+            return f"无法兑换【{item_t.name}】"
     else:
-        target_prop = prop
-    user, account = manager.account(event)
-    bank = prop.locate_bank(user, account)
+        item_t = item
     # 购买道具兑换券，价格 50抽
-    if count > bank[prop.id]:
-        gold = ticket_price * (count - bank[prop.id])
-        if n := GOLD.deal(account.bank, -gold):
-            return f"金币不足。你还有{n}枚金币。（需要：{gold}）"
-        bank[prop.id] = 0
+    ticket_bank = item.bank(account, session)
+    if count > ticket_bank.n:
+        cost = ticket_price * (count - ticket_bank.n)
+        if tn := GOLD.deal(account, -cost, session):
+            return f"金币不足。你还有{tn}枚金币。（需要：{cost}）"
+        ticket_bank.n = 0
     else:
-        gold = 0
-        bank[prop.id] -= count
-
-    target_bank = target_prop.locate_bank(user, account)
-    target_bank[target_prop.id] += count
-    return f"你获得了{count}个【{target_prop.name}】！（使用金币：{gold}）"
-
-
-@usage("绯红迷雾之书", ["user_id", "group_id", "nickname"])
-async def _(prop: Prop, event: Event, count: int, extra: str):
-    user_id = event.user_id
-    bank = manager.data.user(user_id).bank
-    if bank[prop.id] < 1:
-        return f"使用失败，你未持有{prop.name}"
-    group_id = event.group_id
-    folders = {f.name: f for f in manager.backup_path.iterdir() if f.is_dir()}
-    tip = "请输入你要回档的日期:\n" + "\n".join(folders.keys())
-    key = f"{user_id} {group_id}"
-
-    @plugin.temp_handle(key, ["user_id", "group_id"], rule=Rule.locate(user_id, group_id))
-    async def _(event: Event, finish):
-        date = event.raw_command
-        folder = folders.get(date)
-        if not folder:
-            return tip
-        files = {f.stem.split()[1].replace("-", ":"): f for f in folder.iterdir() if f.is_file()}
-        tip2 = "请输入你要回档的时间:\n" + "\n".join(files.keys())
-        finish()
-
-        @plugin.temp_handle(key, ["user_id", "group_id"], rule=Rule.locate(user_id, group_id))
-        async def _(event: Event, finish):
-            clock = event.raw_command
-            file = files.get(clock)
-            if not file:
-                return tip2
-            manager.data.cancel_user(user_id)
-            old_data = manager.data.load(file)
-            user = manager.data.user_dict[user_id] = old_data.user(user_id)
-            user.bank[prop.id] = bank[prop.id] - 1
-            for account_id in user.accounts_map.values():
-                manager.data.register(old_data.account_dict[account_id])
-            finish()
-            return f"你已经回档到{date} {clock}"
-
-        return tip2
-
-    return tip
+        cost = None
+        ticket_bank.n -= count
+    session.add(ticket_bank)
+    item_t.deal(account, count, session)
+    tip = f"你的{item.name}数量不足,将使用{cost}{GOLD.name}购买（单价：{ticket_bank}）。\n" if cost else ""
+    return f"{tip}你获得了{count}个【{item_t.name}】！"
 
 
-@usage("恶魔轮盘", ["user_id", "group_id", "nickname", "Bot_Nickname"])
-async def _(prop: Prop, event: Event, count: int, extra: str):
-    user_id = event.user_id
-    group_id = event.group_id
-    user = manager.data.user(user_id)
-    if user.bank[prop.id] < 1:
-        return f"使用失败，你没有足够的{prop.name}"
-    # 增加一步验证，判断玩家是否一星期内失败过。
-    death_cd: dict[str, float] = manager.data.extra.setdefault("death_cd", {})
-    if user_id in death_cd:
-        death_date = datetime.fromtimestamp(death_cd[user_id])
-        revival_date = (death_date + timedelta(days=7 - death_date.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
-        if datetime.now() < revival_date:
-            return f"您需要在{revival_date.strftime('%Y年%m月%d日')}后才能使用此道具"
-        del death_cd[user_id]
+# @usage("绯红迷雾之书", 1)
+# def _(account: Account, session: Session, item: Item, count: int, extra: str):
+#     folders = {f.name: f for f in manager.backup_path.iterdir() if f.is_dir()}
+#     user_id = account.user_id
+#     group_id = account.group_id
+#     rule: list[Rule.Checker] = [Rule.identify(user_id, group_id), lambda event: event.message in folders]
+#     plugin.temp_handle(["user_id", "group_id"], rule=rule, state=folders)(choise_date)
+#     return "请输入你要回档的日期:\n" + "\n".join(folders.keys())
 
-    @plugin.temp_handle(f"{user_id} {group_id}", ["user_id", "group_id"], timeout=60, rule=Rule.locate(user_id, group_id))
-    async def _(event: Event, finish: Plugin.Finish):
-        finish()
-        command = event.raw_command
-        if command == "取消":
-            return f"你取消了恶魔轮盘"
-        elif command == "开枪":
 
-            async def result():
-                bullet_lst = [0, 0, 0, 0, 0, 0]
-                for i in random.sample([0, 1, 2, 3, 4, 5], random.randint(0, 6)):
-                    bullet_lst[i] = 1
-                index = random.randint(0, 5)
-                yield f"子弹列表{" ".join(str(x) for x in bullet_lst)}，你中了第{index+1}发子弹。"
-                await asyncio.sleep(0.5)
-                if bullet_lst[index] == 1:
-                    death_cd[user_id] = time.time()
-                    manager.data.cancel_user(user_id)
-                    yield "砰！一团火从枪口喷出，你从这个世界上消失了。"
-                else:
-                    yield "咔！你活了下来..."
+# async def choise_date(event: Event, handle: TempHandle):
+#     handle.finish()
+#     folders: dict[str, Path] = handle.state  # type: ignore
+#     folder = folders[event.message]
+#     files = {f.stem.split()[1].replace("-", ":"): f for f in folder.iterdir() if f.is_file()}
+#     user_id = event.user_id
+#     group_id = event.group_id
+#     assert user_id and group_id
+#     rule: list[Rule.Checker] = [Rule.identify(user_id, group_id), lambda event: event.message in files]
+#     plugin.temp_handle(["user_id", "group_id"], rule=rule, state=files)(choise_time)
+#     return "请输入你要回档的时间:\n" + "\n".join(files.keys())
 
-                    def rate_times_bank(bank: Counter, rate: int):
-                        for k in bank.keys():
-                            bank[k] *= rate
 
-                    counter = Counter()
-                    rate_times_bank(user.bank, 10)
-                    user.bank[prop.id] = 1
-                    counter += user.bank
-                    for account_id in user.accounts_map.values():
-                        account = manager.data.account_dict[account_id]
-                        rate_times_bank(account.bank, 10)
-                        counter += account.bank
-                    user.bank[STD_GOLD.id] += manager.stock_value(user.invest) * 10
+# async def choise_time(event: Event, handle: TempHandle):
+#     handle.finish()
+#     files: dict[str, Path] = handle.state  # type: ignore
+#     file = files[event.message]
+#     raise NotImplementedError("无法实现数据库回档")
 
-                    yield ["这是你获得的道具", manager.info_card([prop_card(manager.props_data(counter))], user_id)]
 
-            return result()
-
+@usage("恶魔轮盘", 1)
+def _(account: Account, session: Session, item: Item, count: int, extra: str):
+    user_id = account.user_id
+    group_id = account.group_id
+    rule: list[Rule.Checker] = [Rule.identify(user_id, group_id), lambda event: event.message in ("开枪", "取消")]
+    plugin.temp_handle(["user_id", "group_id"], rule=rule, state=(account.id, item.id))(devil_shoot)
     return "你手中的左轮枪已经装好了子弹，请开枪，或者取消。"
+
+
+async def devil_shoot(event: Event, handle: TempHandle):
+    handle.finish()
+    message = event.message
+    if message == "取消":
+        return f"你取消了恶魔轮盘"
+
+    async def result():
+        bullet_lst = [0, 0, 0, 0, 0, 0]
+        for i in random.sample([0, 1, 2, 3, 4, 5], random.randint(0, 6)):
+            bullet_lst[i] = 1
+        if bullet_lst[0] == 1:
+            yield "砰！一团火从枪口喷出，你从这个世界上消失了。"
+            with manager.db.session as session:
+                user = manager.db.user(event.user_id, session)
+                user.cancel(session)
+        else:
+            yield "咔！你活了下来..."
+            with manager.db.session as session:
+                counter = Counter[str]()
+                for bank in session.exec(UserBank.select().where(UserBank.bound_id == event.user_id)):
+                    item_id = bank.item_id
+                    if item_id.startswith("item:"):
+                        counter[item_id] += bank.n * 10
+                    elif item_id.startswith("stock:"):
+                        stock = session.get(Stock, bank.item_id)
+                        if stock is None:
+                            session.delete(stock)
+                        else:
+                            valuation = int(stock.price * bank.n * 10)
+                            counter[STD_GOLD.id] += valuation
+                for bank in session.exec(
+                    AccountBank.select()
+                    .join(Account)
+                    .where(
+                        Account.user_id == event.user_id,
+                        AccountBank.item_id.startswith("item:"),
+                    )
+                ):
+                    counter[bank.item_id] += bank.n * 10
+                account_id: int
+                item_id: str
+                account_id, item_id = handle.state  # type: ignore
+                counter[item_id] = 1
+                account = session.get(Account, account_id)
+                if account is None:
+                    return
+                data: list[tuple[Item, int]] = []
+                for item_id, n in counter.items():
+                    item = manager.items_library.get(item_id)
+                    if item is None:
+                        continue
+                    item.deal(account, n, session)
+                    data.append((item, n))
+                session.commit()
+            data.sort(key=lambda x: x[0].rare)
+            yield ["这是你获得的道具", manager.info_card([card_template(item_card(data), "恶魔轮盘奖励")], event.user_id)]
+            await asyncio.sleep(0.5)
+        yield f"装弹列表：{" ".join(str(x) for x in bullet_lst)}"
+
+    return result()
