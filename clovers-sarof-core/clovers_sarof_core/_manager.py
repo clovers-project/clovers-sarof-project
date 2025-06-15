@@ -115,8 +115,8 @@ class Manager:
         """
         群内总资产
         """
-        item = self.items_library[item_id]
         wealths: list[int] = []
+        item = self.items_library[item_id]
         group = Group.find(group_name, session)
         if group is None:
             return wealths

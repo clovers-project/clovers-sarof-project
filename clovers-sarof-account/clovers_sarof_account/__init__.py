@@ -4,10 +4,11 @@ from PIL import ImageColor
 from linecard import ImageList
 from clovers import TempHandle
 from clovers.config import Config as CloversConfig
+from clovers_apscheduler import scheduler
 from clovers_sarof_core import __plugin__ as plugin, Event, Rule
 from clovers_sarof_core import manager, client
 from clovers_sarof_core import GOLD, STD_GOLD, REVOLUTION_MARKING, DEBUG_MARKING
-from clovers_sarof_core.account import Stock, Account, Group, AccountBank
+from clovers_sarof_core.account import Stock, Account, Group, AccountBank, UserBank
 from clovers_sarof_core.linecard import (
     text_to_image,
     card_template,
@@ -319,3 +320,25 @@ async def _(event: Event):
     confirm_rule: list[Rule.Checker] = [Rule.identify(user_id, group_id), lambda event: event.message == confirm_code]
     plugin.temp_handle(["user_id", "group_id", "permission"], rule=confirm_rule, state=account_id)(cancel_confirm)
     return f"您即将注销 {account.name}({account.user_id})，请输入{confirm_code}来确认。"
+
+
+def new_day():
+    manager.clean_backup(604800)
+    with manager.db.session as session:
+        banks: list[UserBank | AccountBank] = []
+        banks.extend(session.exec(UserBank.select().where(UserBank.item_id.startswith("item:"))).all())
+        banks.extend(session.exec(AccountBank.select().where(AccountBank.item_id.startswith("item:"))).all())
+        for bank in banks:
+            if (item := manager.items_library.get(bank.item_id)) is None:
+                session.delete(item)
+                continue
+            if item.timeliness == 0:
+                bank.n -= 1
+                if bank.n <= 0:
+                    session.delete(item)
+                    continue
+        session.commit()
+
+
+scheduler.add_job(new_day, trigger="cron", hour=0, misfire_grace_time=120)
+scheduler.add_job(manager.backup, trigger="cron", hour="*/4", misfire_grace_time=120)

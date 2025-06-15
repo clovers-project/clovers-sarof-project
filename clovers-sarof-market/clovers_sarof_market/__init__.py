@@ -3,6 +3,7 @@ import heapq
 import math
 import random
 import asyncio
+from datetime import datetime
 from io import BytesIO
 from linecard import ImageList
 from clovers import TempHandle
@@ -287,7 +288,6 @@ async def _(event: Event):
         group_bank = stock.group.item(stock.id, session).one_or_none()
         if (group_bank is None or group_bank.n <= 0) and not (market := stock.market(session, limit)):
             return "没有符合要求的出售信息"
-        market = sorted(market, key=lambda exchange: exchange.quote)
         level = account.group.level
         my_std_bank = STD_GOLD.bank(account, session)
         my_gold_bank = GOLD.bank(account, session)
@@ -406,7 +406,7 @@ async def _(event: Event):
             if (stock := Stock.find(stock_name, session)) is None:
                 return f"没有 {stock_name} 的注册信息"
             exchanges = stock.market(session)
-            exchanges = heapq.nsmallest(20, exchanges, key=lambda x: x.quote)
+            exchanges = exchanges[:20]
             avatar_urls, infos = zip(*((e.user.avatar_url, f"报价：{e.quote}[pixel 580]数量：{e.n}") for e in exchanges))
         avatars = await asyncio.gather(*(download_url(avatar, client) for avatar in avatar_urls))
         imagelist = avatar_list(zip(avatars, infos))
@@ -534,9 +534,35 @@ def stock_update():
             logger.info(f"{stock.name} 更新成功！")
 
 
-scheduler.add_job(stock_update, trigger="cron", minute="*/5", misfire_grace_time=120)
-
-
 @plugin.handle(["刷新市场"], ["permission"], rule=Rule.superuser)
 async def _(event: Event):
     stock_update()
+
+
+def new_day():
+    with manager.db.session as session:
+        revolution_today = datetime.today().weekday() in {4, 5, 6}
+        if revolution_today:
+            accounts = session.exec(Account.select()).all()
+            for account in accounts:
+                account.extra["revolution"] = revolution_today
+        for group in session.exec(Group.select()).all():
+            query = AccountBank.select().where(AccountBank.bound_id == group.id, AccountBank.item_id == REVOLUTION_MARKING.id)
+            banks = session.exec(query).all()
+            group.level = 1 + sum(bank.n for bank in banks)
+        for stock in session.exec(Stock.select()).all():
+            group_bank = stock.group.item(stock.id, session).one_or_none()
+            if group_bank is None:
+                group_bank = UserBank(bound_id=stock.group.id, item_id=stock.id)
+                session.add(group_bank)
+            banks = session.exec(UserBank.select().where(UserBank.item_id == stock.id))
+            actually_issueance = sum(bank.n for bank in banks) + group_bank.n
+            stock.issuance = 20000 * stock.group.level
+            if actually_issueance != stock.issuance:
+                logger.warning(f"{stock.name} 发行量错误,正在尝试修复。")
+            difference = stock.issuance - actually_issueance
+            group_bank.n += difference
+
+
+scheduler.add_job(stock_update, trigger="cron", minute="*/5", misfire_grace_time=120)
+scheduler.add_job(new_day, trigger="cron", hour=0, misfire_grace_time=120)

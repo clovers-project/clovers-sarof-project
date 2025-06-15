@@ -1,7 +1,8 @@
-from typing import Any, ClassVar, cast, Sequence
+from typing import Any, ClassVar
 from datetime import datetime
-from sqlmodel import SQLModel as BaseSQLModel, Field, Relationship
-from sqlmodel import Session, create_engine, select
+from sqlmodel import SQLModel as BaseSQLModel, Session, select
+from sqlmodel import Field, Relationship
+from sqlmodel import create_engine, col
 from sqlalchemy import Column
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
@@ -34,10 +35,7 @@ class BaseItem:
             return bank.n
         bank.n += unsettled
         if bank.n <= 0:
-            # assert bank.n == 0
-            BankType = type(bank)
-            if (_bank := session.get(BankType, BankType.id == bank.id)) is not None:
-                session.delete(_bank)
+            session.delete(bank)
         else:
             session.add(bank)
         session.commit()
@@ -122,17 +120,22 @@ class Stock(BaseItem, Entity, table=True):
     def bank(self, account: "Account", session: Session):
         return account.user.item(self.id, session).one_or_none() or UserBank(item_id=self.id, bound_id=account.user_id)
 
-    def market(self, session: Session, limit: float = 0):
-        if limit <= 0:
-            return cast(Sequence[Exchange], self.item(self.id, session).all())
+    def market(self, session: Session, quote: float = 0):
+        query = Exchange.select_item(bound_id=self.group_id, item_id=self.id)
+        if quote <= 0:
+            query = select(Exchange).where(
+                Exchange.bound_id == self.group_id,
+                Exchange.item_id == self.id,
+                Exchange.quote > 0.0,
+            )
         else:
             query = select(Exchange).where(
                 Exchange.bound_id == self.group_id,
                 Exchange.item_id == self.id,
-                Exchange.quote <= limit,
+                Exchange.quote <= quote,
                 Exchange.quote > 0.0,
             )
-            return session.exec(query).all()
+        return session.exec(query.order_by(col(Exchange.quote).asc())).all()
 
     @property
     def price(self):
