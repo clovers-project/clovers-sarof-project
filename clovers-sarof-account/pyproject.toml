@@ -18,7 +18,3 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 packages = [{ include = "clovers_sarof" }]
-
-[tool.poetry-monoranger-plugin]
-enabled = true
-monorepo-root = "../"

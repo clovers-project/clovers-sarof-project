@@ -5,13 +5,6 @@ description = ""
 authors = [{ name = "KarisAya", email = "karisaya@foxmail.com" }]
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
-dependencies = [
-    "clovers-sarof @ ./clovers-sarof",
-    "clovers-sarof-account @ ./clovers-sarof-account",
-    "clovers-sarof-market @ ./clovers-sarof-market",
-    "clovers-sarof-prop @ ./clovers-sarof-prop",
-    "clovers-sarof-game-collection @ ./clovers-sarof-game-collection",
-]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -20,15 +13,13 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry]
 package-mode = false
 
+[tool.poetry.dependencies]
+clovers-sarof = { path = "clovers-sarof", develop = true }
+clovers-sarof-account = { path = "clovers-sarof-account", develop = true }
+clovers-sarof-market = { path = "clovers-sarof-market", develop = true }
+clovers-sarof-prop = { path = "clovers-sarof-prop", develop = true }
+clovers-sarof-game-collection = { path = "clovers-sarof-game-collection", develop = true }
+
+
 [tool.poetry.group.dev.dependencies]
 scipy = "^1.15.1"
-
-[tool.poetry-monoranger-plugin]
-enabled = true
-monorepo-root = "."
-# [tool.poetry.dependencies]
-# clovers-sarof = { path = "clovers-sarof", develop = true }
-# clovers-sarof-account = { path = "clovers-sarof-account", develop = true }
-# clovers-sarof-market = { path = "clovers-sarof-market", develop = true }
-# clovers-sarof-prop = { path = "clovers-sarof-prop", develop = true }
-# clovers-sarof-game-collection = { path = "clovers-sarof-game-collection", develop = true }
