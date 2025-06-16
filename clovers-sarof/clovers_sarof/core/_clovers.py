@@ -1,8 +1,8 @@
+from io import BytesIO
 from typing import Any, Protocol
 from collections.abc import AsyncGenerator
 from clovers import EventProtocol, Event as BaseEvent, Result, Plugin
 from .tools import to_int
-from io import BytesIO
 
 
 def build_result(result):

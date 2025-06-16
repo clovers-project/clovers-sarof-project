@@ -1,5 +1,5 @@
 import numpy as np
-from clovers_sarof_core.linecard import card_template
+from clovers_sarof.core.linecard import card_template
 
 curve_fit = {
     1: lambda x: 0.4051548792879075 * np.log(1.5220797359057374 * x) + -0.0020201103448929322 * x + -1.0258025707645715,

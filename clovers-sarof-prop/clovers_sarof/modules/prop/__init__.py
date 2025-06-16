@@ -3,12 +3,12 @@ import asyncio
 from collections import Counter
 from clovers import TempHandle
 from clovers.config import Config as CloversConfig
-from clovers_sarof_core import __plugin__ as plugin, Event, Rule
-from clovers_sarof_core import manager
-from clovers_sarof_core import GOLD, STD_GOLD
-from clovers_sarof_core.account import Session, Item, Stock, Account, AccountBank, UserBank
-from clovers_sarof_core.linecard import card_template, item_card
-from clovers_sarof_core.tools import format_number
+from clovers_sarof.core import __plugin__ as plugin, Event, Rule
+from clovers_sarof.core import manager
+from clovers_sarof.core import GOLD, STD_GOLD
+from clovers_sarof.core.account import Session, Item, Stock, Account, AccountBank, UserBank
+from clovers_sarof.core.linecard import card_template, item_card
+from clovers_sarof.core.tools import format_number
 from .core import usage, gacha, AIR_PACK, RED_PACKET
 from .image import report_card
 from .config import Config

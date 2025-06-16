@@ -3,9 +3,9 @@ import random
 from pathlib import Path
 from typing import Any
 from collections.abc import Callable
-from clovers_sarof_core import __plugin__ as plugin, Event
-from clovers_sarof_core import manager
-from clovers_sarof_core.account import Item, Account, Session
+from clovers_sarof.core import __plugin__ as plugin, Event
+from clovers_sarof.core import manager
+from clovers_sarof.core.account import Item, Account, Session
 
 for k, v in json.loads(Path(__file__).parent.joinpath("props_library.json").read_text(encoding="utf_8")).items():
     item = Item(f"item:{k}", **v)

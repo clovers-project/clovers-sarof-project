@@ -10,12 +10,12 @@ from clovers import TempHandle
 from clovers.logger import logger
 from clovers.config import Config as CloversConfig
 from clovers_apscheduler import scheduler
-from clovers_sarof_core import __plugin__ as plugin, Event, Rule
-from clovers_sarof_core import manager, client
-from clovers_sarof_core import GOLD, STD_GOLD, REVOLUTION_MARKING
-from clovers_sarof_core.account import Stock, Account, User, Group, Exchange, AccountBank, UserBank, GroupBank
-from clovers_sarof_core.linecard import card_template, avatar_list, item_info, item_card, stock_card
-from clovers_sarof_core.tools import format_number, to_int, download_url
+from clovers_sarof.core import __plugin__ as plugin, Event, Rule
+from clovers_sarof.core import manager, client
+from clovers_sarof.core import GOLD, STD_GOLD, REVOLUTION_MARKING
+from clovers_sarof.core.account import Stock, Account, User, Group, Exchange, AccountBank, UserBank, GroupBank
+from clovers_sarof.core.linecard import card_template, avatar_list, item_info, item_card, stock_card
+from clovers_sarof.core.tools import format_number, to_int, download_url
 from .tools import gini_coef, item_name_rule
 from .config import Config
 
