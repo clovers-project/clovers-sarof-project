@@ -73,15 +73,15 @@ def stock_card(data: list[tuple[Stock, int]]):
     return "\n".join(result(*args) for args in data)
 
 
-AVATAR_MASK = Image.new("RGBA", (260, 260), (255, 255, 255, 0))
-ImageDraw.Draw(AVATAR_MASK).ellipse(((0, 0), (260, 260)), fill="black")
+CIRCLE_260_MASK = Image.new("RGBA", (260, 260), (255, 255, 255, 0))
+ImageDraw.Draw(CIRCLE_260_MASK).ellipse(((0, 0), (260, 260)), fill="black")
 
 
 def avatar_card(avatar: bytes | None, nickname: str, lines: list[str] | None = None):
     # assert len(lines) <= 3
     canvas = Image.new("RGBA", (880, 300))
     if avatar:
-        canvas.paste(Image.open(BytesIO(avatar)).resize((260, 260)), (20, 20), AVATAR_MASK)
+        canvas.paste(Image.open(BytesIO(avatar)).resize((260, 260)), (20, 20), CIRCLE_260_MASK)
     draw = ImageDraw.Draw(canvas)
     canvas.paste(linecard(nickname, 40, width=580, padding=(0, 10)), (300, 40))
     draw.line(((300, 120), (860, 120)), fill="gray", width=4)
