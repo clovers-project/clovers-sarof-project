@@ -13,12 +13,12 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry]
 package-mode = false
 
-[tool.poetry.dependencies]
-clovers-sarof = { path = "clovers-sarof", develop = true }
-clovers-sarof-account = { path = "clovers-sarof-account", develop = true }
-clovers-sarof-market = { path = "clovers-sarof-market", develop = true }
-clovers-sarof-prop = { path = "clovers-sarof-prop", develop = true }
-clovers-sarof-game-collection = { path = "clovers-sarof-game-collection", develop = true }
+# [tool.poetry.dependencies]
+# clovers-sarof = { path = "clovers-sarof", develop = true }
+# clovers-sarof-account = { path = "clovers-sarof-account", develop = true }
+# clovers-sarof-market = { path = "clovers-sarof-market", develop = true }
+# clovers-sarof-prop = { path = "clovers-sarof-prop", develop = true }
+# clovers-sarof-game-collection = { path = "clovers-sarof-game-collection", develop = true }
 
 
 [tool.poetry.group.dev.dependencies]
