@@ -197,8 +197,8 @@ ImageDraw.Draw(CIRCLE_60_MASK).ellipse(((0, 0), (60, 60)), fill="black")
 def avatar_list(data: Iterable[tuple[bytes | None, str]]) -> ImageList:
     image_list = []
     for avatar, text in data:
-        canvas = linecard(f"[pixel 80]{text}", 40, width=880)
+        canvas = linecard(f"[pixel 70]{text}", 40, width=880, height=70, padding=(0, 15))
         if avatar:
-            canvas.paste(Image.open(BytesIO(avatar)).resize((60, 60)), (5, 20), CIRCLE_60_MASK)
+            canvas.paste(Image.open(BytesIO(avatar)).resize((60, 60)), (5, 5), CIRCLE_60_MASK)
         image_list.append(canvas)
     return image_list

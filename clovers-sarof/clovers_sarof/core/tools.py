@@ -4,9 +4,22 @@ from collections.abc import Iterable
 from typing import overload
 
 
-class Library[K, V]:
-    """多键字典"""
+class NeverKeyType:
+    def __hash__(self):
+        raise TypeError("NeverKeyType is unhashable")
 
+    def __bool__(self):
+        return False
+
+
+NEVER_KEY = NeverKeyType()
+
+
+def is_samekey(key1, key2):
+    return len({key1, key2}) == 1
+
+
+class Library[K, V]:
     @overload
     def __init__(self, data: Iterable[tuple[K, Iterable[K], V]]) -> None: ...
     @overload
@@ -16,17 +29,40 @@ class Library[K, V]:
         self._key_data: dict[K, V] = {}
         self._index_key: dict[K, K] = {}
         self._key_indices: dict[K, set[K]] = {}
-        if not data:
+        if not data:  # None or empty
             return
-        for key, alias, value in data:
-            self.set_item(key, alias, value)
+        for key, indices, value in data:
+            self.set_library(key, indices, value)
+
+    def __repr__(self):
+        return repr({key: (self._key_indices[key], value) for key, value in self._key_data.items()})
 
     def __getitem__(self, index: K) -> V:
-        return self._key_data.get(index) or self._key_data[self._index_key[index]]
+        if index in self._key_data:
+            return self._key_data[index]
+        if index in self._index_key:
+            return self._key_data[self._index_key[index]]
+        raise KeyError(f"{index} is not a key or alias")
 
-    def __setitem__(self, index: K, data: V):
-        key = self._index_key.get(index, index)
+    def __setitem__(self, key: K, data: V):
+        if key in self._index_key:
+            raise KeyError(f"{key} is already a alias for {self._index_key[key]}")
         self._key_data[key] = data
+        if key not in self._key_indices:
+            self._key_indices[key] = set()
+
+    def __delitem__(self, index: K):
+        if index in self._key_data:
+            del self._key_data[index]
+            if indices := self._key_indices.get(index):
+                for i in indices:
+                    del self._index_key[i]
+                del self._key_indices[index]
+        elif index in self._index_key:
+            self._key_indices[self._index_key[index]].remove(index)
+            del self._index_key[index]
+        else:
+            raise KeyError(f"{index} is not a key or alias")
 
     def __contains__(self, key):
         return key in self._key_indices or key in self._index_key
@@ -43,33 +79,51 @@ class Library[K, V]:
     def items(self):
         return self._key_data.items()
 
-    def set_item(self, key: K, indices: Iterable[K], data: V):
-        if old_indices := self._key_indices.get(key):
-            for i in old_indices:
-                del self._index_key[i]
-        self._key_data[key] = data
+    def primary_key(self, index: K) -> K:
+        return index if index in self._key_data else self._index_key.get(index, NEVER_KEY)  # type: ignore # primary_key returns only K or NEVER_KEY
+
+    def upsert(self, key: K, data: V):
+        if (_key := self.primary_key(key)) is NEVER_KEY:
+            _key = key
+        self[_key] = data
+        return _key
+
+    def delete(self, key: K, missing_ok=True):
+        if (key := self.primary_key(key)) is NEVER_KEY:
+            if missing_ok:
+                return
+            raise KeyError(f"{key} is not a key or alias")
+        del self[key]
+
+    def set_alias(self, index: K, alias: K):
+        if is_samekey(index, alias):
+            raise ValueError(f"{index} and {alias} are same key")
+        if alias in self._key_data:
+            raise KeyError(f"{alias} is a primary key")
+        if (key := self.primary_key(index)) is NEVER_KEY:
+            raise KeyError(f"{index} is not a key or alias")
+        if alias in self._index_key:
+            if is_samekey(key, old_key := self._index_key[alias]):
+                return
+            else:
+                self._key_indices[old_key].remove(alias)
+        self._index_key[alias] = key
+        self._key_indices[key].add(alias)
+
+    def set_library(self, key: K, indices: Iterable[K], data: V):
         indices = set(indices)
-        self._key_indices[key] = indices
-        for i in indices:
-            self._index_key[i] = key
+        if alias := (indices & self._key_data.keys()):
+            raise KeyError(f"{alias} are primary keys")
+        _key = self.upsert(key, data)
+        self._key_indices[_key].update(indices)
+        for alias in indices:
+            if alias in self._index_key and not is_samekey(_key, old_key := self._index_key[alias]):
+                self._key_indices[old_key].remove(alias)
+            self._index_key[alias] = _key
 
-    def __delitem__(self, index: K):
-        if index in self._key_data:
-            del self._key_data[index]
-            if indices := self._key_indices.get(index):
-                for i in indices:
-                    del self._index_key[i]
-                del self._key_indices[index]
-            return
-        if key := self._index_key[index]:
-            del self._index_key[index]
-            self._key_indices[key].discard(index)
-            return
-        raise KeyError(index)
-
-    def update(self, data: "Library[K, V]"):
-        for key, indices, value in data:
-            self.set_item(key, indices, value)
+    def update(self, library: "Library[K, V]"):
+        for data in library:
+            self.set_library(*data)
 
     @overload
     def get(self, index: K) -> V | None: ...
@@ -77,14 +131,16 @@ class Library[K, V]:
     def get(self, index: K, default: V) -> V: ...
 
     def get(self, index: K, default=None):
-        if key := self._index_key.get(index):
-            return self._key_data[key]
-        return self._key_data.get(index, default)
+        if (key := self.primary_key(index)) is not NEVER_KEY:
+            return self[key]
+        else:
+            return default
 
     def setdefault(self, index: K, default: V):
-        if key := self._index_key.get(index):
-            return self._key_data[key]
-        return self._key_data.setdefault(index, default)
+        if (key := self.primary_key(index)) is NEVER_KEY:
+            key = index
+            self[key] = default
+        return self[key]
 
 
 def to_int(N) -> int | None:

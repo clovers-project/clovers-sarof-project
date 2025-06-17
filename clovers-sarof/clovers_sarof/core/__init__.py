@@ -11,7 +11,8 @@ manager = Manager(__config__.path)
 
 GOLD = manager.items_library["金币"]
 STD_GOLD = manager.items_library["标准金币"]
-REVOLUTION_MARKING = manager.items_library["路灯挂件标记"]
+REVOLUTION_MARKING = manager.items_library["路灯挂件"] = manager.items_library["路灯挂件标记"]
+
 DEBUG_MARKING = manager.items_library["Debug奖章"]
 
 client = httpx.AsyncClient()

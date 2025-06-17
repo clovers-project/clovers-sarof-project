@@ -51,7 +51,7 @@ class Manager:
         self.items_library = Library[str, Item]()
         for k, v in json.loads(Path(__file__).parent.joinpath("props_library.json").read_text(encoding="utf_8")).items():
             item = Item(f"item:{k}", **v)
-            self.items_library.set_item(item.id, [item.name], item)
+            self.items_library.set_library(item.id, {item.name}, item)
         self.marking_library = Library[str, Item]()
 
     def backup(self):
