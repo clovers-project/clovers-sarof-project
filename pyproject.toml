@@ -23,3 +23,7 @@ package-mode = false
 
 [tool.poetry.group.dev.dependencies]
 scipy = "^1.15.1"
+
+[tool.poetry.dependencies]
+scipy = "^1.15.3"
+matplotlib = "^3.10.3"
