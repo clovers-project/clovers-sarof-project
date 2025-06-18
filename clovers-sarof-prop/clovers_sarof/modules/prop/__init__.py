@@ -276,7 +276,7 @@ async def devil_shoot(event: Event, handle: TempHandle):
                     data.append((item, n))
                 session.commit()
             data.sort(key=lambda x: x[0].rare)
-            yield ["这是你获得的道具", manager.info_card([card_template(item_card(data), "恶魔轮盘奖励")], event.user_id)]
+            yield ["这是你获得的道具", manager.info_card([card_template(item_card(data), "10倍奖励")], event.user_id)]
             await asyncio.sleep(0.5)
         yield f"装弹列表：{" ".join(str(x) for x in bullet_lst)}"
 
