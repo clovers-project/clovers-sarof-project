@@ -1,5 +1,5 @@
 [project]
-name = "clovers_sarof_prop"
+name = "clovers_sarof_gacha"
 version = "0.1.0"
 description = ""
 authors = [{ name = "KarisAya", email = "karisaya@foxmail.com" }]
@@ -19,3 +19,6 @@ packages = [{ include = "clovers_sarof" }]
 
 [tool.poetry.dependencies]
 clovers-sarof = { path = "../clovers-sarof", develop = true }
+
+[tool.poetry.group.dev.dependencies]
+scipy = "^1.15.1"

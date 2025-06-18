@@ -4,7 +4,7 @@ from clovers_sarof.core.linecard import FONT_DEFAULT, CIRCLE_60_MASK
 from clovers_sarof.core.tools import format_number
 
 
-def draw_rank(data: list[tuple[bytes | None, str, int]], fill="#99CCFFCC"):
+def draw_rank(data: list[tuple[bytes | None, str, int]], fill="#00000066"):
     """
     排名信息
     """
@@ -16,6 +16,6 @@ def draw_rank(data: list[tuple[bytes | None, str, int]], fill="#99CCFFCC"):
         if avatar:
             canvas.paste(Image.open(BytesIO(avatar)).resize((60, 60)), (5, y), CIRCLE_60_MASK)
         draw.rectangle(((70, y + 10), (70 + int(v / first * 790), y + 50)), fill=fill)
-        draw.text((80, y + 10), f"{i}.{nickname} {format_number(v)}", fill=(0, 0, 0), font=FONT_DEFAULT)
+        draw.text((80, y + 10), f"{i}.{nickname} {format_number(v)}", fill=(255, 255, 255), font=FONT_DEFAULT)
         y += 80
     return canvas

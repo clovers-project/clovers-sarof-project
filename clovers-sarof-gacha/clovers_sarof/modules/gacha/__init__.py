@@ -9,7 +9,7 @@ from clovers_sarof.core import GOLD, STD_GOLD
 from clovers_sarof.core.account import Session, Item, Stock, Account, AccountBank, UserBank
 from clovers_sarof.core.linecard import card_template, item_card
 from clovers_sarof.core.tools import format_number
-from .core import usage, gacha, AIR_PACK, RED_PACKET
+from .core import pool, usage, AIR_PACK, RED_PACKET
 from .image import report_card
 from .config import Config
 
@@ -22,6 +22,13 @@ gacha_gold = __config__.gacha_gold
 packet_gold = __config__.packet_gold
 luckey_min, luckey_max = __config__.luckey_coin
 ticket_price = gacha_gold * 50
+
+
+@plugin.startup
+async def _():
+    from .curve_fix_update import update
+
+    update()
 
 
 @plugin.handle(
@@ -43,7 +50,7 @@ async def _(event: Event):
             return f"{count}连抽卡需要{cost_gold}金币，你的金币：{tn}。"
         prop_data: list[list[tuple[Item, int]]] = [[], [], []]
         report_data = {"prop_star": 0, "prop_n": 0, "air_star": 0, "air_n": 0}
-        for prop, n in Counter(gacha() for _ in range(count)).items():
+        for prop, n in Counter(pool.gacha() for _ in range(count)).items():
             prop_data[prop.domain].append((prop, n))
             if prop.domain == 0:
                 star_key = "air_star"

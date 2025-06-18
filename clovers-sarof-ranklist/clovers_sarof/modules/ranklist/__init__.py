@@ -44,7 +44,7 @@ async def _(event: Event):
     else:
         group_id = event.group_id
     data = ranklist(title, group_id)
-    if data is None:
+    if not data:
         return f"无数据，无法进行{title}排行" if event.to_me else None
     avatar_urls, nicknames, values = zip(*data)
     avatar_data = await asyncio.gather(*(download_url(url, client) for url in avatar_urls))
