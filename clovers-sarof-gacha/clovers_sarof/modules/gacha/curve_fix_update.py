@@ -10,11 +10,11 @@ def update():
     input_data = []
     output_data = []
     for i in range(10, 201, 5):
-        array = []
+        average_array = []
         for _ in range(5000):
-            array.append(sum(pool.gacha().rare for _ in range(i)) / i)
+            average_array.append(sum(pool.gacha().rare for _ in range(i)) / i)
         input_data.append(i)
-        output_data.append([np.percentile(array, percentile) for percentile in percentiles])
+        output_data.append([np.percentile(average_array, percentile) for percentile in percentiles])
 
     def func(x, a, b, c, d):
         return a * np.log(b * x) + c * x + d
