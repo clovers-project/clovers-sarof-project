@@ -2,7 +2,7 @@ import random
 from clovers_leafgame.main import plugin
 from clovers_leafgame.clovers import Event
 from ..core import Session, Game
-from .action import place
+from ..action import place
 
 dice_charlist = [" ", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
 

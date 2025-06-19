@@ -3,7 +3,7 @@ from clovers_leafgame.clovers import Event, Result
 from clovers_leafgame.output import text_to_image, BytesIO
 from ..core import Session, Game
 from ..tools import random_poker, poker_show
-from .action import place
+from ..action import place
 
 
 def blackjack_pt(hand: list[tuple[int, int]]) -> int:

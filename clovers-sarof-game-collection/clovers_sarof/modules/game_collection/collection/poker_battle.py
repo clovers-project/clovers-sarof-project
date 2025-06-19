@@ -5,7 +5,7 @@ from clovers_leafgame.clovers import Event
 from clovers_leafgame.output import text_to_image, BytesIO
 from ..core import Session, Game
 from ..tools import random_poker
-from .action import place
+from ..action import place
 
 
 class PokerGame:

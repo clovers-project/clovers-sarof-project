@@ -1,10 +1,1 @@
-from .collection import action
-from .collection import russian_roulette
-from .collection import dice
-from .collection import poker_battle
-from .collection import cantrell
-from .collection import blackjack
-from .collection import western_duel
-from .collection import buckshot_roulette
-from .collection import bohemia_dice
-from .collection import horse_race_game
+from . import collection as _

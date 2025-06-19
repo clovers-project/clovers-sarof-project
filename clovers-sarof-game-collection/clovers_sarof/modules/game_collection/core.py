@@ -1,21 +1,24 @@
 import time
 import asyncio
-from collections import Counter
-from collections.abc import Coroutine, Callable, Sequence
-from clovers_utils.tools import to_int
-from clovers_leafgame.main import manager
-from clovers_leafgame.item import Prop, GOLD
-from clovers_leafgame.output import text_to_image, endline
-from clovers_leafgame.clovers import Event
-from clovers.config import config as clovers_config
+from collections.abc import Coroutine, Callable, Sequence, Iterable
+from clovers.core import Plugin, PluginCommand
+from clovers.config import Config as CloversConfig
+from clovers_sarof.core import Event, Rule
+from clovers_sarof.core import manager
+from clovers_sarof.core import GOLD
+from clovers_sarof.core.account import Item
+from clovers_sarof.core.linecard import card_template
+from clovers_sarof.core.tools import to_int
 from .config import Config
 
-config_key = __package__
-config_data = Config.model_validate(clovers_config.get(config_key, {}))
-clovers_config[config_key] = config_data.model_dump()
 
-default_bet = config_data.default_bet
-timeout = config_data.timeout
+config_data = CloversConfig.environ().setdefault(__package__, {})
+__config__ = Config.model_validate(config_data)
+"""主配置类"""
+config_data.update(__config__.model_dump())
+
+default_bet = __config__.default_bet
+timeout = __config__.timeout
 
 
 class Session:
@@ -33,7 +36,7 @@ class Session:
     round = 1
     next: str
     win: str | None = None
-    bet: tuple[Prop, int] | None = None
+    bet: tuple[Item, int] | None = None
     data: dict = {}
     game: "Game"
     end_tips: str | None = None
@@ -70,7 +73,7 @@ class Session:
     def delay(self, t: float = 0):
         self.time = time.time() + t
 
-    def create_check(self, user_id: str):
+    def cover_check(self, user_id: str):
         p2_uid = self.p2_uid
         if not p2_uid:
             return
@@ -116,29 +119,29 @@ class Session:
             lose = self.p1_uid
             lose_name = self.p1_nickname
 
-        bet = self.bet
-        if bet:
-            tip = manager.transfer(*bet, lose, win, group_id)
-            info = [text_to_image(tip + endline("结算"), autowrap=True)]
-        else:
-            info = []
-        ranklist = manager.data.extra.setdefault("ranklist", {})
-        win_rank = ranklist["win"] = Counter(ranklist.get("win", {}))
-        win_rank[win] += 1
-        lose_rank = ranklist["lose"] = Counter(ranklist.get("lose", {}))
-        lose_rank[lose] += 1
-        win_achieve = ranklist["win_achieve"] = Counter(ranklist.get("win_achieve", {}))
-        win_achieve[win] += 1
-        win_achieve[lose] = 0
-        lose_achieve = ranklist["lose_achieve"] = Counter(ranklist.get("lose_achieve", {}))
-        lose_achieve[win] = 0
-        lose_achieve[lose] += 1
-        card = (
-            f"[pixel 20]◆胜者 {win_name}[pixel 460]◇败者 {lose_name}\n"
-            f"[pixel 20]◆战绩 {win_rank[win]}:{lose_rank[win]}[pixel 460]◇战绩 {win_rank[lose]}:{lose_rank[lose]}\n"
-            f"[pixel 20]◆连胜 {win_achieve[win]}[pixel 460]◇连败 {lose_achieve[lose]}"
-        )
-        info.insert(0, text_to_image(card + endline("对战")))
+        with manager.db.session as session:
+            winner = manager.db.user(win, session)
+            winner.extra["win"] = winner.extra.get("win", 0) + 1
+            win_streak = winner.extra.get("win_streak", 0) + 1
+            winner.extra["win_streak"] = win_streak
+            winner.extra["win_streak_max"] = max(winner.extra.get("win_streak_max", 0), win_streak)
+            winner.extra["lose_streak"] = 0
+            loser = manager.db.user(lose, session)
+            loser.extra["lose"] = loser.extra.get("lose", 0) + 1
+            lose_streak = loser.extra.get("lose_streak", 0) + 1
+            loser.extra["lose_streak"] = lose_streak
+            loser.extra["lose_streak_max"] = max(loser.extra.get("lose_streak_max", 0), lose_streak)
+            loser.extra["win_streak"] = 0
+            card = (
+                f"[pixel 20]◆胜者 {win_name}[pixel 460]◇败者 {lose_name}\n"
+                f"[pixel 20]◆战绩 {winner.extra["win"]}:{winner.extra["lose"]}[pixel 460]◇战绩 {loser.extra["win"]}:{loser.extra["lose"]}\n"
+                f"[pixel 20]◆连胜 {winner.extra["win_streak"]}[pixel 460]◇连败 {loser.extra["lose_streak"]}"
+            )
+            info = [card_template(card, "对战")]
+            bet = self.bet
+            if bet is not None:
+                tip = manager.transfer(*bet, lose, win, group_id, session, force=True)
+                info.append(card_template(tip[1], "结算", autowrap=True))
         result = [f"这场对决是 {win_name} 胜利了", manager.info_card(info, win)]
         if self.end_tips:
             result.append(self.end_tips)
@@ -160,7 +163,7 @@ class Session:
 
 
 class Game:
-    def __init__(self, name: str, action_tip: str) -> None:
+    def __init__(self, name: str, action_tip: str = "") -> None:
         self.name = name
         self.action_tip = action_tip
 
@@ -187,7 +190,7 @@ class Game:
                 return arg, n, name
 
     @staticmethod
-    def session_check(place: dict[str, Session], group_id: str):
+    def session(place: dict[str, Session], group_id: str):
         if not (session := place.get(group_id)):
             return
         if session.timeout() < 0:
@@ -195,42 +198,80 @@ class Game:
             return
         return session
 
-    def create(self, place: dict[str, Session]):
+    def create(
+        self,
+        place: dict[str, Session],
+        plugin: Plugin,
+        command: PluginCommand,
+        properties: Iterable[str] | None = None,
+        priority: int = 1,
+    ):
+        _properties = {"user_id", "group_id", "at"}
+        if properties:
+            _properties.update(properties)
+
         def decorator(func: Callable[[Session, str], Coroutine]):
+            @plugin.handle(command, _properties, rule=Rule.group, priority=priority)
             async def wrapper(event: Event):
                 user_id = event.user_id
-                group_id = event.group_id
-                if (session := self.session_check(place, group_id)) and (tip := session.create_check(user_id)):
+                group_id: str = event.group_id  # type: ignore
+                if (session := self.session(place, group_id)) and (tip := session.cover_check(user_id)):
                     return tip
                 arg, n, prop_name = self.args_parse(event.args)
-                prop = manager.props_library.get(prop_name, GOLD)
-                user, account = manager.locate_account(user_id, group_id)
-                user.connect = group_id
-                bank = prop.locate_bank(user, account)
                 if n < 0:
                     n = default_bet
-                if n > bank[prop.id]:
-                    return f"你没有足够的{prop.name}支撑这场对决({bank[prop.id]})。"
-                session = place[group_id] = Session(group_id, user_id, account.name or user.name, game=self)
-                if event.at:
-                    session.at = event.at[0]
-                    session.p2_nickname = manager.locate_account(session.at, group_id)[1].name
-                if n:
-                    session.bet = (prop, n)
+                with manager.db.session as sql_session:
+                    account = manager.db.account(user_id, group_id, sql_session)
+                    if n > 0:
+                        item = manager.items_library.get(prop_name, GOLD)
+                    if (bank_n := item.bank(account, sql_session).n) < n:
+                        return f"你没有足够的{item.name}支撑这场对决({bank_n})。"
+                    nickname = account.nickname
+                    session = place[group_id] = Session(group_id, user_id, nickname, game=self)
+                    if n > 0:
+                        session.bet = (item, n)
+                    if event.at:
+                        session.at = event.at[0]
+                        session.p2_nickname = manager.db.account(session.at, group_id, sql_session).nickname
                 return await func(session, arg)
 
             return wrapper
 
         return decorator
 
-    def action(self, place: dict[str, Session]):
+    def action(
+        self,
+        place: dict[str, Session],
+        plugin: Plugin,
+        command: PluginCommand,
+        properties: Iterable[str] | None = None,
+        priority: int = 0,
+    ):
+        _properties = {"user_id", "group_id"}
+        if properties:
+            _properties.update(properties)
+        if not self.action_tip:
+            if isinstance(command, Iterable):
+                self.action_tip = " | ".join(command)
+            elif isinstance(command, str):
+                self.action_tip = command
+            elif command is None:
+                self.action_tip = "任何指令"
+            else:
+                self.action_tip = command.pattern
+
         def decorator(func: Callable[[Event, Session], Coroutine]):
+
+            @plugin.handle(command, _properties, priority=priority)
             async def wrapper(event: Event):
-                group_id = event.group_id or manager.data.user(event.user_id).connect
+                user_id = event.user_id
+                group_id = event.group_id
+                if group_id is None:
+                    with manager.db.session as sql_session:
+                        group_id = manager.db.user(user_id, sql_session).connect
                 session = place.get(group_id)
                 if not session or session.game.name != self.name or session.time == -1:
                     return
-                user_id = event.user_id
                 if tip := session.action_check(user_id):
                     return tip
                 return await func(event, session)

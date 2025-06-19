@@ -1,8 +1,6 @@
 import random
-from clovers_leafgame.main import plugin
-from clovers_leafgame.clovers import Event
+from ..action import place, plugin, Event
 from ..core import Session, Game, to_int
-from .action import place
 
 
 russian_roulette = Game("俄罗斯轮盘", "开枪")

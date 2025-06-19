@@ -1,7 +1,7 @@
 from clovers_leafgame.main import plugin
 from clovers_leafgame.clovers import Event
 from ..core import Session, Game
-from .action import place
+from ..action import place
 
 western_duel = Game("西部对战", "装弹|开枪|闪避|闪避开枪|预判开枪")
 

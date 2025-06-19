@@ -2,7 +2,7 @@ import random
 from clovers_leafgame.main import plugin, manager
 from clovers_leafgame.clovers import Event
 from ..core import Session, Game
-from .action import place
+from ..action import place
 
 
 def dice_pt(dice_array: list):

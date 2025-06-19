@@ -98,16 +98,28 @@ class Manager:
             session.refresh(account)
         return account
 
-    def transfer(self, item: Item, unsettled: int, sender_id: str, receiver_id: str, group_id: str, session: Session) -> tuple[bool, str]:
+    def transfer(
+        self,
+        item: Item,
+        unsettled: int,
+        sender_id: str,
+        receiver_id: str,
+        group_id: str,
+        session: Session,
+        force: bool = False,
+    ) -> tuple[bool, str]:
         if unsettled < 1:
             return False, f"数量不能小于1。"
         sender_account = self.db.account(sender_id, group_id, session)
         sender_name = sender_account.name or sender_account.user.name or sender_account.user_id
         if (n := item.deal(sender_account, -unsettled, session)) is not None:
-            return False, f"数量不足。\n——{sender_name}还有{n}个{item.name}。"
+            if force:
+                unsettled = n
+                item.deal(sender_account, -unsettled, session)
+            else:
+                return False, f"数量不足。\n——{sender_name}还有{n}个{item.name}。"
         receiver_account = self.db.account(receiver_id, group_id, session)
         item.deal(receiver_account, unsettled, session)
-        session.commit()
         receiver_name = receiver_account.name or receiver_account.user.name or receiver_account.user_id
         return True, f"{sender_name} 向 {receiver_name} 赠送了{unsettled}个{item.name}"
 

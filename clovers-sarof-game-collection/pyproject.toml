@@ -14,3 +14,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 packages = [{ include = "clovers_sarof" }]
+
+[tool.poetry.dependencies]
+clovers-sarof = { path = "../clovers-sarof", develop = true }

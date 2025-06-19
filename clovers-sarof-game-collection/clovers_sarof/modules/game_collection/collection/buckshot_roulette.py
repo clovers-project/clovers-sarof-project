@@ -4,7 +4,7 @@ from clovers_leafgame.main import plugin
 from clovers_leafgame.clovers import Event
 from clovers_leafgame.output import text_to_image, BytesIO
 from ..core import Session, Game, to_int
-from .action import place
+from ..action import place
 
 buckshot_roulette = Game("恶魔轮盘", "向自己开枪|向对方开枪|使用道具")
 
