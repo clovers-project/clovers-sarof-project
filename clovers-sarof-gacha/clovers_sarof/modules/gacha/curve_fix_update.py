@@ -2,7 +2,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 from functools import partial
 from .core import pool
-from .image import curve_fit_dict
+from .image import fitfunc_dict
 
 
 def update():
@@ -19,9 +19,9 @@ def update():
     def func(x, a, b, c, d):
         return a * np.log(b * x) + c * x + d
 
-    curve_fit_dict.clear()
+    fitfunc_dict.clear()
 
     for i, percentile_data in enumerate(zip(*output_data), start=1):
         popt, pcov = curve_fit(func, input_data, percentile_data)
         a, b, c, d = popt
-        curve_fit_dict[i] = partial(func, a=a, b=b, c=c, d=d)
+        fitfunc_dict[i] = partial(func, a=a, b=b, c=c, d=d)

@@ -24,13 +24,6 @@ luckey_min, luckey_max = __config__.luckey_coin
 ticket_price = gacha_gold * 50
 
 
-@plugin.startup
-async def _():
-    from .curve_fix_update import update
-
-    update()
-
-
 @plugin.handle(
     r"^(.+)连抽?卡?|单抽",
     ["user_id", "group_id", "nickname", "to_me"],
