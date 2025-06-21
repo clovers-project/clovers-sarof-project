@@ -30,7 +30,7 @@ async def _(session: Session, arg: str):
     return f"{' '.join('咔' for _ in range(bullet_num))}，装填完毕\n第一枪的概率为：{bullet_num * 100 / 7 :.2f}%\n{session.create_info}"
 
 
-@place.action("game", ["开枪"])
+@place.action(game, ["开枪"])
 async def _(event: Event, session: Session):
     index = session.data["index"]
     MAG = session.data["bullet"][index:]

@@ -28,8 +28,9 @@ async def _(event: Event):
             tip = f"对战金额为 {n} {item.name}\n"
         else:
             tip = ""
+        nickname = account.name
         sql_session.commit()
-    session.join(user_id, account.name)
+    session.join(user_id, nickname)
     session.next = session.p1_uid
     game = session.game
     tip = f"{session.p2_nickname}接受了对决！\n本场对决为【{game}】\n{tip}请{session.p1_nickname}发送指令\n{place.info[game]}"

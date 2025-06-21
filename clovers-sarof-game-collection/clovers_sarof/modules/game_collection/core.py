@@ -2,6 +2,7 @@ import time
 import asyncio
 from typing import Any
 from collections.abc import Coroutine, Callable, Sequence, Iterable
+from functools import partial
 from clovers.core import Plugin, PluginCommand
 from clovers.config import Config as CloversConfig
 from clovers_sarof.core import Event, Rule
@@ -52,6 +53,9 @@ class Session[Data]:
         self.p1_nickname = nickname
         self.next = user_id
         self.game = game
+
+    def __repr__(self) -> str:
+        return f"Session({self.game}, group_id={self.group_id})"
 
     def join(self, user_id: str, nickname: str):
         self.time = time.time()
@@ -219,7 +223,7 @@ class Manager:
         if properties:
             _properties.update(properties)
 
-        def decorator(func: Callable[[Session, str], Coroutine]):
+        def decorator(func: Callable[[Session, str], Coroutine], _game: str):
             @self.plugin.handle(command, _properties, rule=Rule.group, priority=priority)
             async def wrapper(event: Event):
                 user_id = event.user_id
@@ -236,7 +240,7 @@ class Manager:
                         if (bank_n := item.bank(account, sql_session).n) < n:
                             return f"你没有足够的{item.name}支撑这场对决({bank_n})。"
                     nickname = account.nickname
-                    session = self.place[group_id] = Session(group_id, user_id, nickname, game=game)
+                    session = self.place[group_id] = Session(group_id, user_id, nickname, game=_game)
                     if n > 0:
                         session.bet = (item, n)
                     if event.at:
@@ -246,7 +250,7 @@ class Manager:
 
             return wrapper
 
-        return decorator
+        return partial(decorator, _game=game)
 
     def action(
         self,
@@ -268,8 +272,7 @@ class Manager:
             else:
                 self.info[game] = command.pattern
 
-        def decorator(func: Callable[[Event, Session], Coroutine]):
-
+        def decorator(func: Callable[[Event, Session], Coroutine], _game: str):
             @self.plugin.handle(command, _properties, priority=priority)
             async def wrapper(event: Event):
                 user_id = event.user_id
@@ -278,7 +281,8 @@ class Manager:
                     with manager.db.session as sql_session:
                         group_id = manager.db.user(user_id, sql_session).connect
                 session = self.place.get(group_id)
-                if not session or session.game != game or session.time == -1:
+                print(session, _game)
+                if not session or session.game != _game or session.time == -1:
                     return
                 if tip := session.action_check(user_id):
                     return tip
@@ -286,4 +290,4 @@ class Manager:
 
             return wrapper
 
-        return decorator
+        return partial(decorator, _game=game)
