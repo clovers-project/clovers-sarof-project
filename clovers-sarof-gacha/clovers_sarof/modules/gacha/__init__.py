@@ -79,7 +79,7 @@ def _(account: Account, session: Session, item: Item, count: int, extra: str):
     return f"你使用了{count}枚{item.name}。"
 
 
-@usage("测试金库")
+@usage("测试金库", 0)
 def _(account: Account, session: Session, item: Item, count: int, extra: str):
     return f"你获得了{format_number(count * 1000000000)}金币，{format_number(count * 1000000)}钻石。祝你好运！"
 
@@ -311,8 +311,12 @@ def _(account: Account, session: Session, item: Item, count: int, extra: str):
     session.add(key_bank)
     session.commit()
     rule: Rule.Checker = lambda e: e.user_id == account.user_id
-    code = [random.randint(0, 9) for _ in range(count)]
-    plugin.temp_handle(["user_id", "group_id", "nickname"], timeout=180, rule=rule, state=(account.id, code, []))(unlock_case)
+    plugin.temp_handle(
+        ["user_id", "group_id", "nickname"],
+        timeout=180,
+        rule=rule,
+        state=(account.id, "".join(str(random.randint(0, 9)) for _ in range(count)), []),
+    )(unlock_case)
     return (
         "请在180秒内输入正确的密码！你有10次输入密码的机会，超时或机会用完或导致失败。输入【取消】则会停止解锁。\n"
         f"请输入{count}位密码：{'|'.join('❓'*count)}"
@@ -322,7 +326,7 @@ def _(account: Account, session: Session, item: Item, count: int, extra: str):
 async def unlock_case(event: Event, handle: TempHandle):
     """✅❌🟠🟢❓"""
     account_id: int
-    code: list[int]
+    code: str
     log: list[str]
     account_id, code, log = handle.state  # type: ignore
     with manager.db.session as session:
@@ -341,11 +345,10 @@ async def unlock_case(event: Event, handle: TempHandle):
     show_code = []
     flag = True
     for i, c in enumerate(inputs_code):
-        n = int(c)
-        if n == code[i]:
+        if c == code[i]:
             _pv += 1
             show_code.append(f"{i+1}✅")
-        elif n in code:
+        elif c in code:
             _v += 1
             show_code.append(f"{i+1}🟠")
             flag = False
@@ -355,16 +358,22 @@ async def unlock_case(event: Event, handle: TempHandle):
             flag = False
     if flag:
         times = len(code) - 3
-        match random.randint(0, 9):
-            case 0:
-                item = manager.items_library["恶魔轮盘"]
-                n = times
-                tip = "神秘的箱子被打开，散发着邪恶的气息，将周围的一切都染上了一层不祥的阴影..."
-            case _:
-                item = manager.items_library["初级元素"]
-                n = random.randint(5, 10) * times
-                tip = "神秘的箱子被打开，里面散发着彩色的微光..."
-
+        if not log:
+            item = manager.items_library["测试金库"]
+            n = times
+            tip = "你随手拨了几个数字...箱子被直接打开了，这简直不可能！"
+        elif (randvalue := random.randint(0, 9)) == 0:
+            item = manager.items_library["恶魔轮盘"]
+            n = times
+            tip = "神秘的箱子被打开，散发着邪恶的气息，将周围的一切都染上了一层不祥的阴影..."
+        elif randvalue < 3:
+            item = RED_PACKET
+            n = random.randint(5, 10) * times
+            tip = "神秘的箱子被打开，强烈而刺眼的金色光芒瞬间从箱内迸射而出..."
+        else:
+            item = manager.items_library["初级元素"]
+            n = random.randint(5, 10) * times
+            tip = "神秘的箱子被打开，里面散发出彩色的微光..."
         with manager.db.session as session:
             account = manager.account(event, session)
             assert account is not None
