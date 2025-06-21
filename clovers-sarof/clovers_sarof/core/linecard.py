@@ -33,10 +33,7 @@ def item_info(data: list[tuple[Item, int]]):
     data.sort(key=lambda x: x[0].rare)
 
     def result(item: Item, n: int):
-        if item.timeliness == 1:
-            quant = "天"
-        else:
-            quant = "个"
+        quant = "个" if item.timeliness == 1 else "天"
         return (
             f"[font size=60,color={item.color}]【{item.name}】[right]{format_number(n)}{quant}\n"
             f"----\n{item.intro.replace('\n','[passport]\n')}"
@@ -50,10 +47,7 @@ def item_card(data: list[tuple[Item, int]]):
     data.sort(key=lambda x: x[0].rare)
 
     def result(item: Item, n: int):
-        if item.timeliness == 1:
-            quant = "天"
-        else:
-            quant = "个"
+        quant = "个" if item.timeliness == 1 else "天"
         return f"[font color={item.color}]{item.name}[pixel 350]{item.rare*'☆'}[right]{format_number(n)}{quant}"
 
     return "\n".join(result(*args) for args in data)

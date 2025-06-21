@@ -1,117 +1,92 @@
-from sqlmodel import func, cast, Integer, desc
-from clovers_sarof.core.account import AccountBank, UserBank, Group, User, Account
+import typing
+from sqlmodel import func, cast, Integer, desc, select, Column
+from clovers_sarof.core.account import AccountBank, UserBank, Group, User, Account, Session
 
 
-def _rank_user_extra_all(key: str, limit: int):
+def _rank_user_extra_all(key: str, limit: int, session: Session):
     value = cast(func.json_extract(User.extra, f"$.{key}"), Integer)
-    query = User.select().where(value.isnot(None)).order_by(value.desc()).limit(limit)
-
-    def analyse(user: User):
-        avatar_url = user.avatar_url
-        name = user.name
-        value: int = user.extra[key]
-        return avatar_url, name, value
-
-    return query, analyse
+    query = select(User.avatar_url, User.name, value).where(value.isnot(None)).order_by(value.desc()).limit(limit)
+    return session.exec(query).all()
 
 
-def _rank_user_extra_group(key: str, group_id: str, limit: int):
+def _rank_user_extra_group(key: str, group_id: str, limit: int, session: Session):
     value = cast(func.json_extract(User.extra, f"$.{key}"), Integer)
-    query = Account.select().join(User).where(Account.group_id == group_id, value.isnot(None)).order_by(value.desc()).limit(limit)
-
-    def analyse(account: Account):
-        avatar_url = account.user.avatar_url
-        name = account.nickname
-        value: int = account.user.extra[key]
-        return avatar_url, name, value
-
-    return query, analyse
-
-
-def rank_user_extra(key: str, group_id: str | None, limit: int):
-    if group_id is None:
-        return _rank_user_extra_all(key, limit)
-    else:
-        return _rank_user_extra_group(key, group_id, limit)
-
-
-def _rank_user_bank_all(item_id: str, limit: int):
-    query = UserBank.select().where(UserBank.item_id == item_id).order_by(desc(UserBank.n)).limit(limit)
-
-    def analyse(bank: UserBank):
-        avatar_url = bank.user.avatar_url
-        name = bank.user.name
-        value = bank.n
-        return avatar_url, name, value
-
-    return query, analyse
-
-
-def _rank_user_bank_group(item_id: str, group_id: str | None, limit: int):
     query = (
-        UserBank.select()
-        .join(User)
-        .join(Account)
+        select(User.avatar_url, Account.name, value)
+        .join(User, typing.cast(Column, Account.user_id) == User.id)  # FROM Account
+        .where(Account.group_id == group_id, value.isnot(None))
+        .order_by(value.desc())
+        .limit(limit)
+    )
+    return session.exec(query).all()
+
+
+def rank_user_extra(key: str, group_id: str | None, limit: int, session: Session):
+    if group_id is None:
+        return _rank_user_extra_all(key, limit, session)
+    else:
+        return _rank_user_extra_group(key, group_id, limit, session)
+
+
+def _rank_user_bank_all(item_id: str, limit: int, session: Session):
+    query = (
+        select(User.avatar_url, User.name, UserBank.n)
+        .join(User)  # FROM UserBank
+        .where(UserBank.item_id == item_id)
+        .order_by(desc(UserBank.n))
+        .limit(limit)
+    )
+    return session.exec(query).all()
+
+
+def _rank_user_bank_group(item_id: str, group_id: str | None, limit: int, session: Session):
+    query = (
+        select(User.avatar_url, Account.name, UserBank.n)
+        .join(User, typing.cast(Column, UserBank.bound_id) == User.id)  # FROM UserBank
+        .join(Account, typing.cast(Column, User.id) == Account.user_id)
         .where(UserBank.item_id == item_id, Account.group_id == group_id)
         .order_by(desc(UserBank.n))
         .limit(limit)
     )
 
-    def analyse(bank: UserBank):
-        avatar_url = bank.user.avatar_url
-        name = bank.user.name
-        value = bank.n
-        return avatar_url, name, value
-
-    return query, analyse
+    return session.exec(query).all()
 
 
-def rank_user_bank(item_id: str, group_id: str | None, limit: int):
+def rank_user_bank(item_id: str, group_id: str | None, limit: int, session: Session):
     if group_id is None:
-        return _rank_user_bank_all(item_id, limit)
+        return _rank_user_bank_all(item_id, limit, session)
     else:
-        return _rank_user_bank_group(item_id, group_id, limit)
+        return _rank_user_bank_group(item_id, group_id, limit, session)
 
 
-def _get_account_bank_all(item_id: str, limit: int):
+def _get_account_bank_all(item_id: str, limit: int, session: Session):
     query = (
-        AccountBank.select()
-        .join(Account)
-        .join(Group)
+        select(User.avatar_url, User.name, func.sum(AccountBank.n * Group.level).label("total_value"))
+        .join(Account, typing.cast(Column, AccountBank.bound_id) == Account.id)  # FROM AccountBank
+        .join(User, typing.cast(Column, Account.user_id) == User.id)
+        .join(Group, typing.cast(Column, Account.group_id) == Group.id)
         .where(AccountBank.item_id == item_id)
-        .order_by(desc(AccountBank.n * Group.level))
+        .group_by(User.id, User.avatar_url, User.name)
+        .order_by(desc("total_value"))
         .limit(limit)
     )
-
-    def analyse(bank: AccountBank):
-        avatar_url = bank.account.user.avatar_url
-        name = bank.account.nickname
-        value = bank.n * bank.account.group.level
-        return avatar_url, name, value
-
-    return query, analyse
+    return session.exec(query).all()
 
 
-def _get_account_bank_group(item_id: str, group_id: str | None, limit: int):
+def _get_account_bank_group(item_id: str, group_id: str | None, limit: int, session: Session):
     query = (
-        AccountBank.select()
-        .join(Account)
+        select(User.avatar_url, Account.name, AccountBank.n)
+        .join(Account, typing.cast(Column, AccountBank.bound_id) == Account.id)  # FROM AccountBank
+        .join(User, typing.cast(Column, Account.user_id) == User.id)
         .where(AccountBank.item_id == item_id, Account.group_id == group_id)
         .order_by(desc(AccountBank.n))
         .limit(limit)
     )
-
-    def analyse(bank: AccountBank):
-        avatar_url = bank.account.user.avatar_url
-        name = bank.account.nickname
-        value = bank.n
-        return avatar_url, name, value
-
-    return query, analyse
+    return session.exec(query).all()
 
 
-def rank_account_bank(item_id: str, group_id: str | None, limit: int):
+def rank_account_bank(item_id: str, group_id: str | None, limit: int, session: Session):
     if group_id is None:
-        return _get_account_bank_all(item_id, limit)
+        return _get_account_bank_all(item_id, limit, session)
     else:
-        return _get_account_bank_group(item_id, group_id, limit)
+        return _get_account_bank_group(item_id, group_id, limit, session)

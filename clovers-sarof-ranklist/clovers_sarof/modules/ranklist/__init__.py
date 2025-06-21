@@ -7,32 +7,36 @@ from .image import draw_rank
 from .rankdata import rank_account_bank, rank_user_bank, rank_user_extra
 
 
-def ranklist(title: str, group_id: str | None = None, limit: int = 20):
+user_extra = {
+    "胜场": "win",
+    "败场": "lose",
+    "连胜": "win_streak",
+    "连败": "lose_streak",
+    "最大连胜": "win_streak_max",
+    "最大连败": "lose_streak_max",
+}
 
-    if (item := manager.items_library.get(title)) is not None:
+
+def ranklist(title: str, group_id: str | None = None, limit: int = 20):
+    if title in ("路灯挂件", "重置"):
+        key = REVOLUTION_MARKING.id
+        func = rank_account_bank
+    elif (item := manager.items_library.get(title)) is not None:
         if item.domain == 2:
-            query, func = rank_user_bank(item.id, group_id, limit)
+            key = item.id
+            func = rank_user_bank
         elif item.domain == 1:
-            query, func = rank_account_bank(item.id, group_id, limit)
+            key = item.id
+            func = rank_account_bank
         else:
             return
     else:
-        match title:
-            case "胜场":
-                query, func = rank_user_extra("win", group_id, limit)
-            case "败场":
-                query, func = rank_user_extra("lose", group_id, limit)
-            case "连胜":
-                query, func = rank_user_extra("win_streak", group_id, limit)
-            case "连败":
-                query, func = rank_user_extra("lose_streak", group_id, limit)
-            case "路灯挂件", "重置":
-                query, func = rank_account_bank(REVOLUTION_MARKING.id, None, limit)
-            case _:
-                return
-
+        key = user_extra.get(title)
+        if key is None:
+            return
+        func = rank_user_extra
     with manager.db.session as session:
-        return [func(data) for data in session.exec(query).all()]  # type: ignore # 生成的 query, func 一定是对应的
+        return func(key, group_id, limit, session)
 
 
 @plugin.handle(r"^(.+)排行(.*)", ["user_id", "group_id", "to_me"])
