@@ -233,8 +233,8 @@ class Manager:
                     account = manager.db.account(user_id, group_id, sql_session)
                     if n > 0:
                         item = manager.items_library.get(prop_name, GOLD)
-                    if (bank_n := item.bank(account, sql_session).n) < n:
-                        return f"你没有足够的{item.name}支撑这场对决({bank_n})。"
+                        if (bank_n := item.bank(account, sql_session).n) < n:
+                            return f"你没有足够的{item.name}支撑这场对决({bank_n})。"
                     nickname = account.nickname
                     session = self.place[group_id] = Session(group_id, user_id, nickname, game=game)
                     if n > 0:
