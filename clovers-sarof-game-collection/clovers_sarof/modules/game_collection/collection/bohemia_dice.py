@@ -86,17 +86,21 @@ async def _(event: Event, session: Session):
             session.data[alive_self] -= actN
         next_array = session.data[array_self] = [random.randint(1, 6) for _ in range(session.data[alive_self])]
         if bohemia_dice_pt(next_array)[0] == 0:
-            session.data[pt_table_self] = 0
-            session.data[alive_others] = 6
-            session.data[array_others] = next2_array = first_random_dice()
-            session.nextround()
-            return (
-                f"{tip}\n"
-                f"桌面：\n{bohemia_show_array(next_array)}\n"
-                "本轮失败！\n"
-                f"下一个玩家：{next_user}\n"
-                f"桌面：\n{bohemia_show_array(next2_array)}"
-            )
+            if session.data["last_round"]:
+                session.win = session.p1_uid if session.data["pt1"] > session.data["pt2"] else session.p2_uid
+                return session.end(tip)
+            else:
+                session.data[pt_table_self] = 0
+                session.data[alive_others] = 6
+                session.data[array_others] = next2_array = first_random_dice()
+                session.nextround()
+                return (
+                    f"{tip}\n"
+                    f"桌面：\n{bohemia_show_array(next_array)}\n"
+                    "本轮失败！\n"
+                    f"下一个玩家：{next_user}\n"
+                    f"桌面：\n{bohemia_show_array(next2_array)}"
+                )
         else:
             session.delay()
             return f"{tip}\n桌面：\n{bohemia_show_array(next_array)}"
