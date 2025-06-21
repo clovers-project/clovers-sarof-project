@@ -217,7 +217,7 @@ async def _(event: Event):
             return "无法在当前会话创建账户。"
         stock_data = manager.stock_data(account.user.bank, session)
     if stock_data:
-        return manager.info_card([card_template(stock_card(stock_data), f"股票信息:{account.name}")], event.user_id)
+        return manager.info_card([card_template(stock_card(stock_data), f"股票信息:{event.nickname}")], event.user_id)
     else:
         return "您的仓库空空如也。"
 
@@ -315,11 +315,13 @@ async def _(event: Event):
         account = session.exec(Account.select().where(Account.user_id == user_id, Account.group_id == group_id)).one_or_none()
         if account is None:
             return "目标账户不存在。"
-        account_id = account.id
+        t_account_id = account.id
+        t_nickname = account.nickname
+        t_user_id = account.user_id
     confirm_code = "".join(str(random.randint(0, 9)) for _ in range(4))
     confirm_rule: list[Rule.Checker] = [Rule.identify(user_id, group_id), lambda event: event.message == confirm_code]
-    plugin.temp_handle(["user_id", "group_id", "permission"], rule=confirm_rule, state=account_id)(cancel_confirm)
-    return f"您即将注销 {account.name}({account.user_id})，请输入{confirm_code}来确认。"
+    plugin.temp_handle(["user_id", "group_id", "permission"], rule=confirm_rule, state=t_account_id)(cancel_confirm)
+    return f"您即将注销 {t_nickname}({t_user_id})，请输入{confirm_code}来确认。"
 
 
 def new_day():

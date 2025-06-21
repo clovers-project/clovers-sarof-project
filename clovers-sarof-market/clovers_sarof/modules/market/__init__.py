@@ -65,7 +65,8 @@ async def _(event: Event):
                 bank.n = int(bank.n * rate)
         group.level += 1
         session.commit()
-    return f"当前系数为：{gini:f3}，重置成功！恭喜{top.account.nickname}进入挂件榜☆！重置签到已刷新。"
+        nickname = top.account.nickname
+    return f"当前系数为：{gini:f3}，重置成功！恭喜{nickname}进入挂件榜☆！重置签到已刷新。"
 
 
 @plugin.handle(["重置签到", "领取金币"], ["user_id", "group_id", "nickname", "avatar"])
@@ -189,7 +190,7 @@ async def _(event: Event):
                     imagelist.append(card_template(item_card(item_data), "群仓库"))
             if stock_data:
                 imagelist.append(card_template(stock_card(stock_data), "群投资"))
-        return manager.info_card(imagelist, user_id) if imagelist else "群金库是空的"
+        return manager.info_card(imagelist, user_id) if imagelist else "群仓库是空的"
     sign, name = command[0], command[1:]
     with manager.db.session as session:
         if (item := (manager.items_library.get(name) or Stock.find(name, session))) is None:
@@ -254,7 +255,7 @@ async def _(event: Event):
         group_bank = session.exec(GroupBank.select_item(group.id, GOLD.id)).one_or_none()
         if group_bank is None or (n := group_bank.n) < company_public_gold:
             n = n if group_bank else 0
-            return f"把注册到市场要求群金库至少有 {company_public_gold} {GOLD.name}，本群数量：{n}\n请使用指令【群仓库存{GOLD.name}】存入。"
+            return f"把注册到市场要求群仓库至少有 {company_public_gold} {GOLD.name}，本群数量：{n}\n请使用指令【群仓库存{GOLD.name}】存入。"
         group_bank.n = 0
         stock_value = n * group.level
         STD_GOLD.corp_deal(group, stock_value, session)
@@ -270,8 +271,9 @@ async def _(event: Event):
         ).all()
         stock_value += sum(bank.n for bank in banks) * group.level
         stock.reset_value(stock_value)
+        price = stock_value / stock.issuance
         session.commit()
-    return f"{stock.name}发行成功，发行价格为{format_number(stock_value/ stock.issuance)}金币"
+    return f"{stock_name}发行成功，发行价格为{format_number(price)}金币"
 
 
 @plugin.handle(["购买", "发行购买"], ["user_id", "group_id", "nickname"])
@@ -414,10 +416,11 @@ async def _(event: Event):
         with manager.db.session as session:
             all_stocks = session.exec(Stock.select()).all()
             data = [(stock, bank.n) for stock in all_stocks if (bank := stock.group.item(stock.id, session).one_or_none())]
-        if not data:
-            return "市场为空"
-        data.sort(key=lambda x: x[0].value, reverse=True)
-        imagelist = [card_template(stock_card(data), "市场信息")]
+            if not data:
+                return "市场为空"
+            data.sort(key=lambda x: x[0].value, reverse=True)
+            stock_card_info = stock_card(data)
+    imagelist = [card_template(stock_card_info, "市场信息")]
     return manager.info_card(imagelist, event.user_id)
 
 

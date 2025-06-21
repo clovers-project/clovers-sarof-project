@@ -226,7 +226,7 @@ class Manager:
         game: str,
         command: PluginCommand,
         properties: Iterable[str] | None = None,
-        priority: int = 1,
+        priority: int = 10,
     ):
         _properties = {"user_id", "group_id", "at"}
         if properties:
@@ -266,7 +266,7 @@ class Manager:
         game: str,
         command: PluginCommand,
         properties: Iterable[str] | None = None,
-        priority: int = 0,
+        priority: int = 20,
     ):
         _properties = {"user_id", "group_id"}
         if properties:
@@ -290,7 +290,6 @@ class Manager:
                     with manager.db.session as sql_session:
                         group_id = manager.db.user(user_id, sql_session).connect
                 session = self.place.get(group_id)
-                print(session, game)
                 if not session or session.game != game or session.time == -1:
                     return
                 if tip := session.action_check(user_id):

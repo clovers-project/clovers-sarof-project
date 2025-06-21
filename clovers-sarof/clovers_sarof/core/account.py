@@ -26,7 +26,7 @@ class BaseItem:
         raise NotImplementedError
 
     def corp_deal(self, group: "Group", unsettled: int, session: Session):
-        bank = group.item(self.id, session).one_or_none() or BaseBank(item_id=self.id, bound_id=group.id)
+        bank = group.item(self.id, session).one_or_none() or GroupBank(item_id=self.id, bound_id=group.id)
         return self.bank_deal(bank, unsettled, session)
 
     @staticmethod

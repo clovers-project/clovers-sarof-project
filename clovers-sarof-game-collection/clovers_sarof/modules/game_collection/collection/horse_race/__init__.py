@@ -4,7 +4,7 @@ from clovers.config import Config as CloversConfig
 from clovers_sarof.core.linecard import text_to_image
 from clovers_sarof.core import manager
 from ...action import place, Event, Rule
-from ...core import Session
+from ...core import Session as BaseSession
 from .core import RaceWorld
 from .config import Config
 
@@ -30,6 +30,8 @@ kwargs = {
 game = "赛马小游戏"
 place.info[game] = "赛马加入 名字"
 
+type Session = BaseSession[RaceWorld]
+
 
 @place.create(game, ["赛马创建"])
 async def _(session: Session, arg: str):
@@ -39,7 +41,7 @@ async def _(session: Session, arg: str):
         tip = f"\n> 本场奖金：{n}{prop.name}"
     else:
         tip = ""
-    session.data["world"] = RaceWorld(**kwargs)
+    session.data = RaceWorld(**kwargs)
     return f"> 创建赛马比赛成功！{tip},\n> 输入 【赛马加入 名字】 即可加入赛马。"
 
 
@@ -61,20 +63,19 @@ async def _(event: Event):
             assert account is not None
             if (bn := item.bank(account, sql_session).n) < n:
                 return f"报名赛马需要{n}个{item.name}（你持有的的数量{bn}）"
-    world: RaceWorld = session.data["world"]
+    world: RaceWorld = session.data
     return world.join_horse(horsename, account.user_id, account.name)
 
 
 @place.plugin.handle(["赛马开始"], ["user_id", "group_id"])
 async def _(event: Event):
     group_id: str = event.group_id  # type: ignore
-    session = place.session(group_id)
+    session: Session | None = place.session(group_id)
     if session is None:
         return
     if session.game != game:
         return
-    world = session.data["world"]
-    assert isinstance(world, RaceWorld)
+    world = session.data
     if world.status == 1:
         return
     player_count = len(world.racetrack)

@@ -146,6 +146,7 @@ def _(account: Account, session: Session, item: Item, count: int, extra: str):
             bank.n = 0
             info.append(f"结果是反面...\n你没有足够数量的{bet_item.name}...\n全部拿出来吧！（{count}）")
         else:
+            bank.n -= count
             info.append(f"结果是反面...\n你你失去了{count}个{bet_item.name}...")
             if random.randint(0, 1) == 0:
                 user_id = account.user_id

@@ -73,7 +73,7 @@ type ItemUsage = Callable[[Account, Session, Item, int, str], Any]
 usage_lib: dict[str, tuple[ItemUsage, int | None]] = {}
 
 
-@plugin.handle(f"使用(道具)?\\s*(.+)\\s*(\\d*)(.*)", ["user_id", "group_id", "nickname"])
+@plugin.handle(r"使用(道具)?\s*(\S+)\s*(\d*)(.*)", ["user_id", "group_id", "nickname"])
 async def _(event: Event):
     _, item_name, count, extra = event.args
     if (use := usage_lib.get(item_name)) is None:
@@ -88,8 +88,9 @@ async def _(event: Event):
             return "无法在当前会话创建账户。"
         if cost != 0:
             cost = cost or count
+            item = manager.items_library[item_name]
             if (tn := item.deal(account, -cost, session)) is not None:
-                return f"使用失败，你还有{tn}枚{item.name}。"
+                return f"使用失败，你还有{tn}个{item.name}。"
         return use(account, session, item, count, extra)
 
 
