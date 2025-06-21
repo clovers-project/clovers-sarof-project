@@ -1,15 +1,15 @@
 import asyncio
-from clovers_sarof.core import __plugin__ as plugin, manager
+from clovers_sarof.core import __plugin__, manager
 from clovers_sarof.core import Event, Rule
-from .core import Session, Game
+from .core import Manager
 
-place: dict[str, Session] = {}
+place = Manager(__plugin__)
 
 
-@plugin.handle(["接受挑战"], ["user_id", "group_id", "nickname"], rule=Rule.group)
+@place.plugin.handle(["接受挑战"], ["user_id", "group_id", "nickname"], rule=Rule.group)
 async def _(event: Event):
     group_id: str = event.group_id  # type: ignore
-    session = Game.session(place, group_id)
+    session = place.session(group_id)
     if not session:
         return
     user_id = event.user_id
@@ -31,41 +31,43 @@ async def _(event: Event):
         sql_session.commit()
     session.join(user_id, account.name)
     session.next = session.p1_uid
-    msg = f"{session.p2_nickname}接受了对决！\n本场对决为【{session.game.name}】\n{tip}请{session.p1_nickname}发送指令\n{session.game.action_tip}"
+    game = session.game
+    tip = f"{session.p2_nickname}接受了对决！\n本场对决为【{game}】\n{tip}请{session.p1_nickname}发送指令\n{place.info[game]}"
+
     if session.start_tips:
 
         async def result():
-            yield msg
+            yield tip
             await asyncio.sleep(1)
             yield session.start_tips
 
         return result()
-    return msg
+    return tip
 
 
-@plugin.handle(["拒绝挑战"], ["user_id", "group_id"], rule=Rule.group)
+@place.plugin.handle(["拒绝挑战"], ["user_id", "group_id"], rule=Rule.group)
 async def _(event: Event):
     group_id: str = event.group_id  # type: ignore
-    session = Game.session(place, group_id)
+    session = place.session(group_id)
     if session and (at := session.at) and at == event.user_id:
         if session.p2_uid:
             return "对决已开始，拒绝失败。"
         return "拒绝成功，对决已结束。"
 
 
-@plugin.handle(["超时结算"], ["user_id", "group_id"], rule=Rule.group)
+@place.plugin.handle(["超时结算"], ["user_id", "group_id"], rule=Rule.group)
 async def _(event: Event):
     group_id: str = event.group_id  # type: ignore
-    session = Game.session(place, group_id)
-    if (session := place.get(group_id)) and session.timeout() < 0:
+    session = place.session(group_id)
+    if (session := place.place.get(group_id)) and session.timeout() < 0:
         session.win = session.p2_uid if session.next == session.p1_uid else session.p1_uid
         return session.end()
 
 
-@plugin.handle(["认输"], ["user_id", "group_id"], rule=Rule.group)
+@place.plugin.handle(["认输"], ["user_id", "group_id"], rule=Rule.group)
 async def _(event: Event):
     group_id: str = event.group_id  # type: ignore
-    session = place.get(group_id)
+    session = place.place.get(group_id)
     if not session or session.p2_uid is None:
         return
     user_id = event.user_id
@@ -78,13 +80,13 @@ async def _(event: Event):
     return session.end()
 
 
-@plugin.handle(["游戏重置", "清除对战"], ["user_id", "group_id", "permission"], rule=Rule.group)
+@place.plugin.handle(["游戏重置", "清除对战"], ["user_id", "group_id", "permission"], rule=Rule.group)
 async def _(event: Event):
     group_id: str = event.group_id  # type: ignore
-    session = place.get(group_id)
+    session = place.place.get(group_id)
     if not session:
         return
     if session.timeout() > 0 and event.permission < 1:
         return f"当前游戏未超时。"
-    del place[group_id]
+    del place.place[group_id]
     return "游戏已重置。"

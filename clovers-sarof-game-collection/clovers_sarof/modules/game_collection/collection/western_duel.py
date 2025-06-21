@@ -1,23 +1,24 @@
-from clovers_leafgame.main import plugin
-from clovers_leafgame.clovers import Event
-from ..core import Session, Game
-from ..action import place
+from typing import TypedDict
+from ..action import place, Event
+from ..core import Session as BaseSession
 
-western_duel = Game("西部对战", "装弹|开枪|闪避|闪避开枪|预判开枪")
+game = "西部对战"
+place.info[game] = "装弹|开枪|闪避|闪避开枪|预判开枪"
 
 
-@plugin.handle(["西部对战"], ["user_id", "group_id", "at"], priority=1)
-@western_duel.create(place)
+class SessionData(TypedDict):
+    MAG1: int
+    MAG2: int
+    card: str | None
+
+
+type Session = BaseSession[SessionData]
+
+
+@place.create(game, ["西部对战"])
 async def _(session: Session, arg: str):
-    session.data["MAG1"] = 1
-    session.data["MAG2"] = 1
-    session.data["card"] = None
-    if session.bet:
-        prop, n = session.bet
-        tip = f"\n本场下注：{n}{prop.name}/轮"
-    else:
-        tip = ""
-    return f"【西部对战】游戏已创建。{tip}\n{session.create_info()}"
+    session.data = {"MAG1": 1, "MAG2": 1, "card": None}
+    return f"【西部对战】游戏已创建。\n{session.create_info}"
 
 
 def western_duel_action(event: Event, session: Session, card: str):
@@ -30,8 +31,7 @@ def western_duel_action(event: Event, session: Session, card: str):
         return "MAG2", f"双方行动: {session.data['card']} - {card}"
 
 
-@plugin.handle(["装弹"], ["user_id", "group_id"])
-@western_duel.action(place)
+@place.action(game, ["装弹"])
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "装弹")
     if not MAG:
@@ -57,8 +57,7 @@ async def _(event: Event, session: Session):
         return result
 
 
-@plugin.handle(["开枪"], ["user_id", "group_id"])
-@western_duel.action(place)
+@place.action(game, ["开枪"])
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
     if not MAG:
@@ -88,8 +87,7 @@ async def _(event: Event, session: Session):
         return result
 
 
-@plugin.handle(["闪避"], ["user_id", "group_id"])
-@western_duel.action(place)
+@place.action(game, ["闪避"])
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
     if not MAG:
@@ -113,8 +111,7 @@ async def _(event: Event, session: Session):
         return result
 
 
-@plugin.handle(["闪枪"], ["user_id", "group_id"])
-@western_duel.action(place)
+@place.action(game, ["闪枪"])
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
     if not MAG:
@@ -144,8 +141,7 @@ async def _(event: Event, session: Session):
         return result
 
 
-@plugin.handle(["预判开枪"], ["user_id", "group_id"])
-@western_duel.action(place)
+@place.action(game, ["预判开枪"])
 async def _(event: Event, session: Session):
     MAG, tip = western_duel_action(event, session, "开枪")
     if not MAG:

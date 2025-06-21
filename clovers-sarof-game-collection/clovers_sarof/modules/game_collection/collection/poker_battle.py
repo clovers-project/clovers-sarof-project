@@ -1,14 +1,17 @@
 import random
 import asyncio
-from clovers_leafgame.main import plugin
-from clovers_leafgame.clovers import Event
-from clovers_leafgame.output import text_to_image, BytesIO
-from ..core import Session, Game
-from ..tools import random_poker
-from ..action import place
+from io import BytesIO
+from typing import TypedDict
+from clovers_sarof.core.linecard import text_to_image
+from ..action import place, Event
+from ..core import Session as BaseSession
+from ..tools import PokerCard, random_poker
+
+game = "扑克对战"
+place.info[game] = "出牌 1/2/3"
 
 
-class PokerGame:
+class Gamer:
     suit = {0: "结束", 1: "♠防御", 2: "♥恢复", 3: "♣技能", 4: "♦攻击"}
     point = {
         0: " 0",
@@ -27,20 +30,11 @@ class PokerGame:
         13: "13",
     }
 
-    def __init__(self) -> None:
-        deck = random_poker(2)
-        hand = deck[:3]
-        deck = deck[3:]
-        self.deck = deck + [(0, 0), (0, 0), (0, 0), (0, 0)]
-        self.P1 = Gamer(hand, 20)
-        self.P2 = Gamer([], 25, SP=2)
-
     @classmethod
-    def card(cls, suit: int, point: int):
+    def card(cls, card: PokerCard):
+        suit, point = card
         return f"{cls.suit[suit]}{cls.point[point]}"
 
-
-class Gamer:
     def __init__(
         self,
         hand: list[tuple[int, int]],
@@ -55,14 +49,16 @@ class Gamer:
         self.DEF = DEF
         self.SP = SP
 
+    @property
     def status(self) -> str:
         return f"HP {self.HP} SP {self.SP} DEF {self.DEF}"
 
+    @property
     def handcard(self) -> str:
-        return "\n".join(f"【{PokerGame.card(*card)}】" for i, card in enumerate(self.hand, 1))
+        return "\n".join(f"【{self.card(card)}】" for i, card in enumerate(self.hand, 1))
 
     def action_ACE(self, roll: int = 1) -> list[str]:
-        msg = [f"技能牌：\n{self.handcard()}"]
+        msg = [f"技能牌：\n{self.handcard}"]
         for suit, point in self.hand:
             point = roll if point == 1 else point
             match suit:
@@ -113,10 +109,9 @@ class Gamer:
                     msg.append(f"♦发动了攻击{point}")
         return msg
 
-    def action_passive(self, card: tuple[int, int]) -> list[str]:
-        msg = []
+    def action_passive(self, card: PokerCard) -> list[str]:
+        msg = [f"技能牌：{self.card(card)}"]
         suit, point = card
-        msg.append(f"技能牌：{PokerGame.card(suit, point)}")
         match suit:
             case 1:
                 self.DEF += point
@@ -135,44 +130,41 @@ class Gamer:
         return msg
 
 
-poker_battle = Game("扑克对战", "出牌")
+class SessionData(TypedDict):
+    ACT: bool
+    deck: list[PokerCard]
+    P1: Gamer
+    P2: Gamer
 
 
-@plugin.handle(["扑克对战"], ["user_id", "group_id", "at"], priority=1)
-@poker_battle.create(place)
+type Session = BaseSession[SessionData]
+
+
+@place.create(game, ["扑克对战"])
 async def _(session: Session, arg: str):
-    poker_data = PokerGame()
-    session.data["ACT"] = False
-    session.data["poker"] = poker_data
-    if session.bet:
-        prop, n = session.bet
-        tip = f"\n本场下注：{n}{prop.name}"
-    else:
-        tip = ""
-    session.start_tips = f"P1初始手牌\n{poker_data.P1.handcard()}"
-    return f"唰唰~，随机牌堆已生成{tip}\n{session.create_info()}"
+    deck = random_poker(2)
+    session.data = {"ACT": False, "deck": deck[3:], "P1": Gamer(deck[:3], 20), "P2": Gamer([], 25, SP=2)}
+    session.start_tips = f"P1初始手牌\n{session.data["P1"].handcard}"
+    return f"唰唰~，随机牌堆已生成\n{session.create_info}"
 
 
-@plugin.handle(["出牌"], ["user_id", "group_id"])
-@poker_battle.action(place)
+@place.action(game, ["出牌"])
 async def _(event: Event, session: Session):
     if session.data["ACT"]:
         return
     user_id = event.user_id
     if not 1 <= (index := event.args_to_int()) <= 3:
-        return "请发送【出牌 1/2/3】打出你的手牌。"
-    index -= 1
+        return f"请发送【{place.info[game]}】打出你的手牌。"
     session.data["ACT"] = True
+    index -= 1
     session.nextround()
-    poker_data = session.data["poker"]
-    assert isinstance(poker_data, PokerGame)
     if user_id == session.p1_uid:
-        active = poker_data.P1
-        passive = poker_data.P2
+        active = session.data["P1"]
+        passive = session.data["P2"]
         passive_name = session.p2_nickname
     else:
-        active = poker_data.P2
-        passive = poker_data.P1
+        active = session.data["P2"]
+        passive = session.data["P1"]
         passive_name = session.p1_nickname
     msg = active.action_active(index)
     if passive.SP > 1:
@@ -182,8 +174,7 @@ async def _(event: Event, session: Session):
             msg.append("技能发动失败...")
         else:
             msg.append("技能发动成功！")
-            msg += passive.action_passive(poker_data.deck[0])
-            poker_data.deck = poker_data.deck[1:]
+            msg += passive.action_passive(session.data["deck"].pop(0))
     # 回合结算
     if passive.ATK > active.DEF:
         active.HP += active.DEF - passive.ATK
@@ -193,19 +184,19 @@ async def _(event: Event, session: Session):
     passive.ATK = 0
     passive.DEF = 0
     # 下回合准备
-    passive.hand = hand = poker_data.deck[0:3]
-    poker_data.deck = poker_data.deck[3:]
-    output = BytesIO()
+    passive.hand = hand = session.data["deck"][0:3]
+    del session.data["deck"][:3]
+
     text_to_image(
         f"玩家：{session.p1_nickname}\n"
-        f"状态：{poker_data.P1.status()}\n"
+        f"状态：{session.data["P1"].status}\n"
         "----\n"
         f"玩家：{session.p2_nickname}\n"
-        f"状态：{poker_data.P2.status()}\n"
-        "----\n" + passive.handcard(),
+        f"状态：{session.data["P2"].status}\n"
+        "----\n" + passive.handcard,
         width=540,
         bg_color="white",
-    ).save(output, format="png")
+    ).save(output := BytesIO(), format="png")
     msg = "\n".join(msg)
 
     async def result(tip: str):
@@ -214,7 +205,7 @@ async def _(event: Event, session: Session):
         yield [tip, output]
 
     if active.HP < 1 or passive.HP < 1 or passive.HP > 40 or (0, 0) in hand:
-        session.win = session.p1_uid if poker_data.P1.HP > poker_data.P2.HP else session.p2_uid
+        session.win = session.p1_uid if session.data["P1"].HP > session.data["P2"].HP else session.p2_uid
         return session.end(result("游戏结束"))
     session.data["ACT"] = False
-    return result(f"请{passive_name}发送【出牌 1/2/3】打出你的手牌。")
+    return result(f"请{passive_name}发送【{place.info[game]}】打出你的手牌。")

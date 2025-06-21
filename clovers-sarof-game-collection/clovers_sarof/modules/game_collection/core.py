@@ -1,5 +1,6 @@
 import time
 import asyncio
+from typing import Any
 from collections.abc import Coroutine, Callable, Sequence, Iterable
 from clovers.core import Plugin, PluginCommand
 from clovers.config import Config as CloversConfig
@@ -21,7 +22,7 @@ default_bet = __config__.default_bet
 timeout = __config__.timeout
 
 
-class Session:
+class Session[Data]:
     """
     游戏场次信息
     """
@@ -37,12 +38,14 @@ class Session:
     next: str
     win: str | None = None
     bet: tuple[Item, int] | None = None
-    data: dict = {}
-    game: "Game"
+    basebet: int = 0
+    maxbet: int = 0
+    data: Data
+    game: str
     end_tips: str | None = None
-    start_tips: ... = None
+    start_tips: Any = None
 
-    def __init__(self, group_id: str, user_id: str, nickname: str, game: "Game"):
+    def __init__(self, group_id: str, user_id: str, nickname: str, game: str):
         self.time = time.time()
         self.group_id = group_id
         self.p1_uid = user_id
@@ -66,9 +69,9 @@ class Session:
     def double_bet(self):
         if not self.bet:
             return
-        prop, n = self.bet
-        n += self.data["bet"]
-        self.bet = (prop, min(n, self.data["bet_limit"]))
+        item, n = self.bet
+        n += self.basebet
+        self.bet = (item, min(n, self.maxbet) if self.maxbet > 0 else n)
 
     def delay(self, t: float = 0):
         self.time = time.time() + t
@@ -96,12 +99,19 @@ class Session:
             return f"现在是{self.p1_nickname if self.next == self.p1_uid else self.p2_nickname}的回合"
         return f"{self.p1_nickname} v.s. {self.p2_nickname}\n正在进行中..."
 
+    @property
     def create_info(self):
+        if self.bet:
+            item, n = self.bet
+            self.basebet = n
+            tip = f"本场下注：{n}{item.name}\n"
+        else:
+            tip = ""
         if self.at:
             p2_nickname = self.p2_nickname or f"玩家{self.at[:4]}..."
-            return f"{self.p1_nickname} 向 {p2_nickname} 发起挑战！\n请 {p2_nickname} 回复 接受挑战 or 拒绝挑战\n【{timeout}秒内有效】"
+            return f"{tip}{self.p1_nickname} 向 {p2_nickname} 发起挑战！\n请 {p2_nickname} 回复 接受挑战 or 拒绝挑战\n【{timeout}秒内有效】"
         else:
-            return f"{self.p1_nickname} 发起挑战！\n回复 接受挑战 即可开始对局。\n【{timeout}秒内有效】"
+            return f"{tip}{self.p1_nickname} 发起挑战！\n回复 接受挑战 即可开始对局。\n【{timeout}秒内有效】"
 
     def settle(self):
         """
@@ -162,10 +172,19 @@ class Session:
         return output()
 
 
-class Game:
-    def __init__(self, name: str, action_tip: str = "") -> None:
-        self.name = name
-        self.action_tip = action_tip
+class Manager:
+    def __init__(self, plugin: Plugin):
+        self.place: dict[str, Session] = {}
+        self.plugin = plugin
+        self.info: dict[str, str] = {}
+
+    def session(self, group_id: str):
+        if not (session := self.place.get(group_id)):
+            return
+        if session.timeout() < 0:
+            del self.place[group_id]
+            return
+        return session
 
     @staticmethod
     def args_parse(args: Sequence[str]) -> tuple[str, int, str]:
@@ -189,19 +208,9 @@ class Game:
                     n = 0
                 return arg, n, name
 
-    @staticmethod
-    def session(place: dict[str, Session], group_id: str):
-        if not (session := place.get(group_id)):
-            return
-        if session.timeout() < 0:
-            del place[group_id]
-            return
-        return session
-
     def create(
         self,
-        place: dict[str, Session],
-        plugin: Plugin,
+        game: str,
         command: PluginCommand,
         properties: Iterable[str] | None = None,
         priority: int = 1,
@@ -211,11 +220,11 @@ class Game:
             _properties.update(properties)
 
         def decorator(func: Callable[[Session, str], Coroutine]):
-            @plugin.handle(command, _properties, rule=Rule.group, priority=priority)
+            @self.plugin.handle(command, _properties, rule=Rule.group, priority=priority)
             async def wrapper(event: Event):
                 user_id = event.user_id
                 group_id: str = event.group_id  # type: ignore
-                if (session := self.session(place, group_id)) and (tip := session.cover_check(user_id)):
+                if (session := self.session(group_id)) and (tip := session.cover_check(user_id)):
                     return tip
                 arg, n, prop_name = self.args_parse(event.args)
                 if n < 0:
@@ -227,7 +236,7 @@ class Game:
                     if (bank_n := item.bank(account, sql_session).n) < n:
                         return f"你没有足够的{item.name}支撑这场对决({bank_n})。"
                     nickname = account.nickname
-                    session = place[group_id] = Session(group_id, user_id, nickname, game=self)
+                    session = self.place[group_id] = Session(group_id, user_id, nickname, game=game)
                     if n > 0:
                         session.bet = (item, n)
                     if event.at:
@@ -241,8 +250,7 @@ class Game:
 
     def action(
         self,
-        place: dict[str, Session],
-        plugin: Plugin,
+        game: str,
         command: PluginCommand,
         properties: Iterable[str] | None = None,
         priority: int = 0,
@@ -250,27 +258,27 @@ class Game:
         _properties = {"user_id", "group_id"}
         if properties:
             _properties.update(properties)
-        if not self.action_tip:
+        if not game in self.info:
             if isinstance(command, Iterable):
-                self.action_tip = " | ".join(command)
+                self.info[game] = " | ".join(command)
             elif isinstance(command, str):
-                self.action_tip = command
+                self.info[game] = command
             elif command is None:
-                self.action_tip = "任何指令"
+                self.info[game] = "任何指令"
             else:
-                self.action_tip = command.pattern
+                self.info[game] = command.pattern
 
         def decorator(func: Callable[[Event, Session], Coroutine]):
 
-            @plugin.handle(command, _properties, priority=priority)
+            @self.plugin.handle(command, _properties, priority=priority)
             async def wrapper(event: Event):
                 user_id = event.user_id
                 group_id = event.group_id
                 if group_id is None:
                     with manager.db.session as sql_session:
                         group_id = manager.db.user(user_id, sql_session).connect
-                session = place.get(group_id)
-                if not session or session.game.name != self.name or session.time == -1:
+                session = self.place.get(group_id)
+                if not session or session.game != game or session.time == -1:
                     return
                 if tip := session.action_check(user_id):
                     return tip

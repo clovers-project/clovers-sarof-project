@@ -2,8 +2,9 @@ import asyncio
 from io import BytesIO
 from clovers.config import Config as CloversConfig
 from clovers_sarof.core.linecard import text_to_image
-from ...action import place, plugin, manager, Event, Rule
-from ...core import Session, Game
+from clovers_sarof.core import manager
+from ...action import place, Event, Rule
+from ...core import Session
 from .core import RaceWorld
 from .config import Config
 
@@ -26,11 +27,11 @@ kwargs = {
     "event_randvalue": event_randvalue,
 }
 
+game = "赛马小游戏"
+place.info[game] = "赛马加入 名字"
 
-horse_race = Game("赛马小游戏", "赛马加入 名字")
 
-
-@horse_race.create(place, plugin, ["赛马创建"])
+@place.create(game, ["赛马创建"])
 async def _(session: Session, arg: str):
     session.at = session.p1_uid
     if session.bet:
@@ -42,13 +43,13 @@ async def _(session: Session, arg: str):
     return f"> 创建赛马比赛成功！{tip},\n> 输入 【赛马加入 名字】 即可加入赛马。"
 
 
-@plugin.handle(["赛马加入"], ["user_id", "group_id", "nickname"], rule=Rule.group)
+@place.plugin.handle(["赛马加入"], ["user_id", "group_id", "nickname"], rule=Rule.group)
 async def _(event: Event):
     group_id: str = event.group_id  # type: ignore
-    session = Game.session(place, group_id)
+    session = place.session(group_id)
     if session is None:
         return
-    if session.game.name != horse_race.name:
+    if session.game != game:
         return
     horsename = event.single_arg()
     if not horsename:
@@ -64,13 +65,13 @@ async def _(event: Event):
     return world.join_horse(horsename, account.user_id, account.name)
 
 
-@plugin.handle(["赛马开始"], ["user_id", "group_id"])
+@place.plugin.handle(["赛马开始"], ["user_id", "group_id"])
 async def _(event: Event):
     group_id: str = event.group_id  # type: ignore
-    session = Game.session(place, group_id)
+    session = place.session(group_id)
     if session is None:
         return
-    if session.game.name != horse_race.name:
+    if session.game != game:
         return
     world = session.data["world"]
     assert isinstance(world, RaceWorld)

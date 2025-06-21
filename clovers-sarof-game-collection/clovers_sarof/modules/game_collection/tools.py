@@ -1,7 +1,9 @@
 import random
 
+type PokerCard = tuple[int, int]
 
-def random_poker(n: int = 1, range_point: tuple[int, int] = (1, 14)):
+
+def random_poker(n: int = 1, range_point: tuple[int, int] = (1, 14)) -> list[PokerCard]:
     """
     生成随机牌库
     """

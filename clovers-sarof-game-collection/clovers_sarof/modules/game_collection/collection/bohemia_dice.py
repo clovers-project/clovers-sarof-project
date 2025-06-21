@@ -1,102 +1,46 @@
 import random
-from clovers_leafgame.main import plugin
-from clovers_leafgame.clovers import Event
-from ..core import Session, Game
-from ..action import place
+from typing import TypedDict
+from ..action import place, Event
+from ..core import Session as BaseSession
 
-dice_charlist = [" ", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
-
-
-def bohemia_show_array(array: list[int]):
-    output = [f"{i} [{dice_charlist[d]}] " for i, d in enumerate(array, start=1)]
-    if len(array) > 3:
-        output.insert(3, "\n")
-    return "".join(output)
+game = "天国骰子"
+place.info[game] = "123456 继续|结束"
 
 
-def bohemia_dice_pt(array: list[int]):
-    """array长度1-6"""
-    array_set = set(array)
-
-    def straight_rest(array: list[int]):
-        if array.count(1) == 2:
-            return 100
-        elif array.count(5) == 2:
-            return 50
-        else:
-            return 0
-
-    match len(array_set):
-        case 6:
-            return 1500, 6
-        case 5:
-            if 6 not in array_set:
-                pt = 500 + straight_rest(array)
-                return pt, 5 + int(pt != 500)
-            elif 1 not in array_set:
-                pt = 750 + straight_rest(array)
-                return pt, 5 + int(pt != 750)
-            else:
-                x = array.count(1)
-                y = array.count(5)
-                return x * 100 + y * 50, x + y
-    actN = 0
-    pt = 0
-    n = array.count(1)
-    if n > 2:
-        actN += n
-        pt += 1000 * (2 ** (n - 3))
-    elif n > 0:
-        actN += n
-        pt += 100 * n
-    n = array.count(5)
-    if n > 2:
-        actN += n
-        pt += 500 * (2 ** (n - 3))
-    elif n > 0:
-        actN += n
-        pt += 50 * n
-    for i in [2, 3, 4, 6]:
-        n = array.count(i)
-        if n > 2:
-            actN += n
-            pt += i * 100 * (2 ** (n - 3))
-    return pt, actN
+class SessionData(TypedDict):
+    pt1: int
+    pt1_table: int
+    array1: list[int]
+    alive1: int
+    pt2: int
+    pt2_table: int
+    array2: list[int]
+    alive2: int
+    last_round: bool
 
 
-def first_random_dice():
-    while bohemia_dice_pt(array := [random.randint(1, 6) for _ in range(6)])[0] == 0:
-        pass
-    return array
+type Session = BaseSession[SessionData]
 
 
-bohemia_dice = Game("天国骰子", "123456 继续|结束")
-
-
-@plugin.handle(["天国骰子"], ["user_id", "group_id", "at"], priority=1)
-@bohemia_dice.create(place)
+@place.create(game, ["天国骰子"])
 async def _(session: Session, arg: str):
-    session.data["pt1"] = 0
-    session.data["pt1_table"] = 0
     array = first_random_dice()
-    session.data["array1"] = array
-    session.data["alive1"] = 6
-    session.data["pt2"] = 0
-    session.data["pt2_table"] = 0
-    session.data["array2"] = None
-    session.data["alive2"] = 6
-    session.data["last_round"] = False
-    if session.bet:
-        prop, n = session.bet
-        tip = f"\n本场下注：{n}{prop.name}/轮"
-    else:
-        tip = ""
+    session.data = {
+        "pt1": 0,
+        "pt1_table": 0,
+        "array1": array,
+        "alive1": 6,
+        "pt2": 0,
+        "pt2_table": 0,
+        "array2": [],
+        "alive2": 6,
+        "last_round": False,
+    }
     session.start_tips = f"桌面：\n{bohemia_show_array(array)}"
-    return f"【天国骰子】游戏已创建。{tip}\n{session.create_info()}"
+    return f"【天国骰子】游戏已创建。\n{session.create_info}"
 
 
-@plugin.handle(r"([1-6]+) ?(继续|结束)", ["user_id", "group_id"])
-@bohemia_dice.action(place)
+@place.action(game, r"([1-6]+) ?(继续|结束)")
 async def _(event: Event, session: Session):
     user_id = event.user_id
     if user_id == session.p1_uid:
@@ -181,3 +125,69 @@ async def _(event: Event, session: Session):
         session.data[array_others] = next_array = first_random_dice()
         session.nextround()
         return f"{tip}\n下一个玩家：{next_user}\n桌面：\n{bohemia_show_array(next_array)}"
+
+
+dice_charlist = [" ", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"]
+
+
+def bohemia_show_array(array: list[int]):
+    output = [f"{i} [{dice_charlist[d]}] " for i, d in enumerate(array, start=1)]
+    if len(array) > 3:
+        output.insert(3, "\n")
+    return "".join(output)
+
+
+def bohemia_dice_pt(array: list[int]):
+    """array长度1-6"""
+    array_set = set(array)
+
+    def straight_rest(array: list[int]):
+        if array.count(1) == 2:
+            return 100
+        elif array.count(5) == 2:
+            return 50
+        else:
+            return 0
+
+    match len(array_set):
+        case 6:
+            return 1500, 6
+        case 5:
+            if 6 not in array_set:
+                pt = 500 + straight_rest(array)
+                return pt, 5 + int(pt != 500)
+            elif 1 not in array_set:
+                pt = 750 + straight_rest(array)
+                return pt, 5 + int(pt != 750)
+            else:
+                x = array.count(1)
+                y = array.count(5)
+                return x * 100 + y * 50, x + y
+    actN = 0
+    pt = 0
+    n = array.count(1)
+    if n > 2:
+        actN += n
+        pt += 1000 * (2 ** (n - 3))
+    elif n > 0:
+        actN += n
+        pt += 100 * n
+    n = array.count(5)
+    if n > 2:
+        actN += n
+        pt += 500 * (2 ** (n - 3))
+    elif n > 0:
+        actN += n
+        pt += 50 * n
+    for i in [2, 3, 4, 6]:
+        n = array.count(i)
+        if n > 2:
+            actN += n
+            pt += i * 100 * (2 ** (n - 3))
+    return pt, actN
+
+
+def first_random_dice():
+    while bohemia_dice_pt(array := [random.randint(1, 6) for _ in range(6)])[0] == 0:
+        pass
+    return array

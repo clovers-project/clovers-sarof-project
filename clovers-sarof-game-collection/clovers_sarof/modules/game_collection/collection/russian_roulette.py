@@ -1,13 +1,21 @@
 import random
-from ..action import place, plugin, Event
-from ..core import Session, Game, to_int
+from typing import TypedDict
+from ..action import place, Event
+from ..core import Session as BaseSession, to_int
+
+game = "俄罗斯轮盘"
+place.info[game] = "开枪"
 
 
-russian_roulette = Game("俄罗斯轮盘", "开枪")
+class SessionData(TypedDict):
+    bullet: list[int]
+    index: int
 
 
-@plugin.handle(["俄罗斯轮盘", "装弹"], ["user_id", "group_id", "at"], priority=1)
-@russian_roulette.create(place)
+type Session = BaseSession[SessionData]
+
+
+@place.create(game, ["俄罗斯轮盘", "装弹"])
 async def _(session: Session, arg: str):
     bullet_num = to_int(arg)
     if bullet_num:
@@ -17,26 +25,16 @@ async def _(session: Session, arg: str):
     bullet = [0, 0, 0, 0, 0, 0, 0]
     for i in random.sample([0, 1, 2, 3, 4, 5, 6], bullet_num):
         bullet[i] = 1
-    session.data["bullet_num"] = bullet_num
-    session.data["bullet"] = bullet
-    session.data["index"] = 0
-    if session.bet:
-        prop, n = session.bet
-        tip = f"\n本场下注：{n}{prop.name}"
-    else:
-        tip = ""
-    tip += f"\n第一枪的概率为：{round(bullet_num * 100 / 7,2)}%"
+    session.data = {"bullet": bullet, "index": 0}
     session.end_tips = str(bullet)
-    return f"{' '.join('咔' for _ in range(bullet_num))}，装填完毕{tip}\n{session.create_info()}"
+    return f"{' '.join('咔' for _ in range(bullet_num))}，装填完毕\n第一枪的概率为：{bullet_num * 100 / 7 :.2f}%\n{session.create_info}"
 
 
-@plugin.handle(["开枪"], ["user_id", "group_id"])
-@russian_roulette.action(place)
+@place.action("game", ["开枪"])
 async def _(event: Event, session: Session):
-    bullet = session.data["bullet"]
     index = session.data["index"]
+    MAG = session.data["bullet"][index:]
     user_id = event.user_id
-    MAG = bullet[index:]
     count = event.args_to_int() or 1
     l_MAG = len(MAG)
     if count < 0 or count > l_MAG:
@@ -58,4 +56,4 @@ async def _(event: Event, session: Session):
                 "看来运气不错，你活了下来",
             ]
         )
-        return f"{shot_tip}{random_tip}\n下一枪中弹的概率：{round(session.data['bullet_num'] * 100 / (l_MAG - count),2)}%\n接下来轮到{next_name}了..."
+        return f"{shot_tip}{random_tip}\n下一枪中弹的概率：{len(session.data["bullet"]) * 100 / (l_MAG - count):.2f}%\n接下来轮到{next_name}了..."
