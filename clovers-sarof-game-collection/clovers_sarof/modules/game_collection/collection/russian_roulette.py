@@ -8,6 +8,7 @@ place.info[game] = "开枪"
 
 
 class SessionData(TypedDict):
+    bullet_num: int
     bullet: list[int]
     index: int
 
@@ -25,7 +26,7 @@ async def _(session: Session, arg: str):
     bullet = [0, 0, 0, 0, 0, 0, 0]
     for i in random.sample([0, 1, 2, 3, 4, 5, 6], bullet_num):
         bullet[i] = 1
-    session.data = {"bullet": bullet, "index": 0}
+    session.data = {"bullet_num": bullet_num, "bullet": bullet, "index": 0}
     session.end_tips = str(bullet)
     return f"{' '.join('咔' for _ in range(bullet_num))}，装填完毕\n第一枪的概率为：{bullet_num * 100 / 7 :.2f}%\n{session.create_info}"
 
@@ -56,4 +57,4 @@ async def _(event: Event, session: Session):
                 "看来运气不错，你活了下来",
             ]
         )
-        return f"{shot_tip}{random_tip}\n下一枪中弹的概率：{len(session.data["bullet"]) * 100 / (l_MAG - count):.2f}%\n接下来轮到{next_name}了..."
+        return f"{shot_tip}{random_tip}\n下一枪中弹的概率：{session.data["bullet_num"] * 100 / (l_MAG - count) :.2f}%\n接下来轮到{next_name}了..."

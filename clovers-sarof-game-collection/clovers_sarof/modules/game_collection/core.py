@@ -2,7 +2,6 @@ import time
 import asyncio
 from typing import Any
 from collections.abc import Coroutine, Callable, Sequence, Iterable
-from functools import partial
 from clovers.core import Plugin, PluginCommand
 from clovers.config import Config as CloversConfig
 from clovers_sarof.core import Event, Rule
@@ -134,18 +133,28 @@ class Session[Data]:
             lose_name = self.p1_nickname
 
         with manager.db.session as session:
+            # 胜者
             winner = manager.db.user(win, session)
+            # 获胜数据
             winner.extra["win"] = winner.extra.get("win", 0) + 1
             win_streak = winner.extra.get("win_streak", 0) + 1
             winner.extra["win_streak"] = win_streak
             winner.extra["win_streak_max"] = max(winner.extra.get("win_streak_max", 0), win_streak)
+            # 中断连败
+            winner.extra.setdefault("lose", 0)
             winner.extra["lose_streak"] = 0
+            winner.extra.setdefault("lose_streak_max", 0)
+            # 败者
             loser = manager.db.user(lose, session)
+            # 失败数据
             loser.extra["lose"] = loser.extra.get("lose", 0) + 1
             lose_streak = loser.extra.get("lose_streak", 0) + 1
             loser.extra["lose_streak"] = lose_streak
             loser.extra["lose_streak_max"] = max(loser.extra.get("lose_streak_max", 0), lose_streak)
+            # 中断连胜
+            loser.extra.setdefault("win", 0)
             loser.extra["win_streak"] = 0
+            loser.extra.setdefault("win_streak_max", 0)
             card = (
                 f"[pixel 20]◆胜者 {win_name}[pixel 460]◇败者 {lose_name}\n"
                 f"[pixel 20]◆战绩 {winner.extra["win"]}:{winner.extra["lose"]}[pixel 460]◇战绩 {loser.extra["win"]}:{loser.extra["lose"]}\n"
@@ -223,7 +232,7 @@ class Manager:
         if properties:
             _properties.update(properties)
 
-        def decorator(func: Callable[[Session, str], Coroutine], _game: str):
+        def decorator(func: Callable[[Session, str], Coroutine]):
             @self.plugin.handle(command, _properties, rule=Rule.group, priority=priority)
             async def wrapper(event: Event):
                 user_id = event.user_id
@@ -240,7 +249,7 @@ class Manager:
                         if (bank_n := item.bank(account, sql_session).n) < n:
                             return f"你没有足够的{item.name}支撑这场对决({bank_n})。"
                     nickname = account.nickname
-                    session = self.place[group_id] = Session(group_id, user_id, nickname, game=_game)
+                    session = self.place[group_id] = Session(group_id, user_id, nickname, game=game)
                     if n > 0:
                         session.bet = (item, n)
                     if event.at:
@@ -250,7 +259,7 @@ class Manager:
 
             return wrapper
 
-        return partial(decorator, _game=game)
+        return decorator
 
     def action(
         self,
@@ -272,7 +281,7 @@ class Manager:
             else:
                 self.info[game] = command.pattern
 
-        def decorator(func: Callable[[Event, Session], Coroutine], _game: str):
+        def decorator(func: Callable[[Event, Session], Coroutine]):
             @self.plugin.handle(command, _properties, priority=priority)
             async def wrapper(event: Event):
                 user_id = event.user_id
@@ -281,8 +290,8 @@ class Manager:
                     with manager.db.session as sql_session:
                         group_id = manager.db.user(user_id, sql_session).connect
                 session = self.place.get(group_id)
-                print(session, _game)
-                if not session or session.game != _game or session.time == -1:
+                print(session, game)
+                if not session or session.game != game or session.time == -1:
                     return
                 if tip := session.action_check(user_id):
                     return tip
@@ -290,4 +299,4 @@ class Manager:
 
             return wrapper
 
-        return partial(decorator, _game=game)
+        return decorator
