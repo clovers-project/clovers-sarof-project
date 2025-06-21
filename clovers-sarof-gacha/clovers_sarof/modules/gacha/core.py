@@ -16,6 +16,7 @@ AIR = manager.items_library["空气"]
 AIR_PACK = manager.items_library["空气礼包"]
 RED_PACKET = manager.items_library["随机红包"]
 DIAMOND = manager.items_library["钻石"]
+VIP_CARD = manager.items_library["钻石会员卡"]
 
 
 class CardPool:
@@ -55,6 +56,8 @@ pool_names = [
     "初级元素",
     "高级空气",
     "钻石会员卡",
+    "无名木箱",
+    "开锁器",
     "特级空气",
     "进口空气",
     "幸运硬币",
@@ -86,9 +89,9 @@ async def _(event: Event):
         account = manager.account(event, session)
         if account is None:
             return "无法在当前会话创建账户。"
+        item = manager.items_library[item_name]
         if cost != 0:
             cost = cost or count
-            item = manager.items_library[item_name]
             if (tn := item.deal(account, -cost, session)) is not None:
                 return f"使用失败，你还有{tn}个{item.name}。"
         return use(account, session, item, count, extra)
@@ -100,5 +103,6 @@ def usage(item_name: str, cost: int | None = None):
         if item is None:
             raise ValueError(f"不存在道具{item_name}，无法注册使用方法。")
         usage_lib[item_name] = use, cost
+        return use
 
     return decorator

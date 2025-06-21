@@ -1,3 +1,4 @@
+import time
 import random
 import asyncio
 from collections import Counter
@@ -9,7 +10,7 @@ from clovers_sarof.core import GOLD, STD_GOLD
 from clovers_sarof.core.account import Session, Item, Stock, Account, AccountBank, UserBank
 from clovers_sarof.core.linecard import card_template, item_card
 from clovers_sarof.core.tools import format_number
-from .core import pool, usage, AIR_PACK, RED_PACKET
+from .core import pool, usage, AIR_PACK, RED_PACKET, VIP_CARD
 from .image import report_card
 from .config import Config
 
@@ -169,18 +170,25 @@ def _(account: Account, session: Session, item: Item, count: int, extra: str):
         item_t = item
     # 购买道具兑换券，价格 50抽
     ticket_bank = item.bank(account, session)
+    tips = []
     if count > ticket_bank.n:
         cost = ticket_price * (count - ticket_bank.n)
+        tips.append(f"你的{item.name}数量不足,将使用{cost}{GOLD.name}购买（单价：{ticket_bank}）。")
+        if VIP_CARD.bank(account, session).n > 0:
+            discount = int(cost * 0.2)
+            tips.append(f"【{VIP_CARD.name}】20%off （-{discount}）")
+            cost -= discount
         if tn := GOLD.deal(account, -cost, session):
-            return f"金币不足。你还有{tn}枚金币。（需要：{cost}）"
+            tips.append(f"金币不足。你还有{tn}枚金币。（需要：{cost}）")
+            return "\n".join(tips)
         ticket_bank.n = 0
     else:
         cost = None
         ticket_bank.n -= count
     session.add(ticket_bank)
     item_t.deal(account, count, session)
-    tip = f"你的{item.name}数量不足,将使用{cost}{GOLD.name}购买（单价：{ticket_bank}）。\n" if cost else ""
-    return f"{tip}你获得了{count}个【{item_t.name}】！"
+    tips.append(f"你获得了{count}个【{item_t.name}】！")
+    return "\n".join(tips)
 
 
 # @usage("绯红迷雾之书", 1)
@@ -282,3 +290,93 @@ async def devil_shoot(event: Event, handle: TempHandle):
         yield f"装弹列表：{" ".join(str(x) for x in bullet_lst)}"
 
     return result()
+
+
+@usage("无名木箱", 0)
+@usage("开锁器", 0)
+def _(account: Account, session: Session, item: Item, count: int, extra: str):
+    item_case = manager.items_library["无名木箱"]
+    if (case_bank := item_case.bank(account, session)).n < 1:
+        return "你未持有无名木箱"
+    item_key = manager.items_library["开锁器"]
+    if (key_bank := item_key.bank(account, session)).n < 1:
+        return "你未持有开锁器"
+    if count == 1:
+        count = 4
+    elif count > 6 or count < 4:
+        return "只支持4-6位密码"
+    case_bank.n -= 1
+    key_bank.n -= 1
+    session.add(case_bank)
+    session.add(key_bank)
+    session.commit()
+    rule: Rule.Checker = lambda e: e.user_id == account.user_id
+    code = [random.randint(0, 9) for _ in range(count)]
+    plugin.temp_handle(["user_id", "group_id", "nickname"], timeout=180, rule=rule, state=(account.id, code, []))(unlock_case)
+    return (
+        "请在180秒内输入正确的密码！你有10次输入密码的机会，超时或机会用完或导致失败。输入【取消】则会停止解锁。\n"
+        f"请输入{count}位密码：{'|'.join('❓'*count)}"
+    )
+
+
+async def unlock_case(event: Event, handle: TempHandle):
+    """✅❌🟠🟢❓"""
+    account_id: int
+    code: list[int]
+    log: list[str]
+    account_id, code, log = handle.state  # type: ignore
+    with manager.db.session as session:
+        account = manager.account(event, session)
+        if account is None or account.id != account_id:
+            return
+    if event.message == "取消":
+        handle.finish()
+        return "取消解锁！"
+    inputs_code = event.message[: len(code)]
+    if not inputs_code.isdigit():
+        return "请输入数字！"
+    _pv = 0
+    _v = 0
+    _w = 0
+    show_code = []
+    flag = True
+    for i, c in enumerate(inputs_code):
+        n = int(c)
+        if n == code[i]:
+            _pv += 1
+            show_code.append(f"{i+1}✅")
+        elif n in code:
+            _v += 1
+            show_code.append(f"{i+1}🟠")
+            flag = False
+        else:
+            _w += 1
+            show_code.append(f"{i+1}❌")
+            flag = False
+    if flag:
+        times = len(code) - 3
+        match random.randint(0, 9):
+            case 0:
+                item = manager.items_library["恶魔轮盘"]
+                n = times
+                tip = "神秘的箱子被打开，散发着邪恶的气息，将周围的一切都染上了一层不祥的阴影..."
+            case _:
+                item = manager.items_library["初级元素"]
+                n = random.randint(5, 10) * times
+                tip = "神秘的箱子被打开，里面散发着彩色的微光..."
+
+        with manager.db.session as session:
+            account = manager.account(event, session)
+            assert account is not None
+            item.deal(account, n, session)
+        handle.finish()
+        return f"密码为:{inputs_code} 输入正确！\n{tip}\n你获得了{n}个{item.name}。"
+    else:
+        log.append("|".join(show_code))
+        msg = [f"第{i}次输入:{c}" for i, c in enumerate(log, start=1)]
+        msg.append(f"{_pv}个数字正确，{_v}个数字正确但位置不对，{_w}个数字错误。")
+        msg.append(f"剩余时间：{int(handle.expiration - time.time())}秒")
+        if len(log) >= 10:
+            handle.finish()
+            msg.append("密码破解失败。")
+        return "\n".join(msg)
