@@ -14,7 +14,8 @@ def draw_rank(data: list[tuple[bytes | None, str, int]], fill="#FFFFFFAA"):
     y = 20
     for i, (avatar, nickname, v) in enumerate(data, start=1):
         if avatar:
-            canvas.paste(Image.open(BytesIO(avatar)).resize((60, 60)), (5, y), CIRCLE_60_MASK)
+            (avatar_image := Image.open(BytesIO(avatar)).resize((60, 60))).putalpha(CIRCLE_60_MASK)
+            canvas.paste(avatar_image, (5, y))
         draw.rectangle(((70, y + 10), (70 + int(v / first * 790), y + 50)), fill=fill)
         draw.text((80, y + 10), f"{i}.{nickname} {format_number(v)}", fill=(0, 0, 0), font=FONT_DEFAULT)
         y += 80

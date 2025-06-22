@@ -280,58 +280,50 @@ async def _(event: Event):
 async def _(event: Event):
     if not (args := event.args_parse()):
         return
-    stock_name, buy_count, limit = args
+    stock_name, buy_count, quote = args
     with manager.db.session as session:
         if (stock := Stock.find(stock_name, session)) is None:
             return f"没有 {stock_name} 的注册信息"
+        if not (price := stock.price) > 0:
+            return "股票价格异常，无法结算。"
         account = manager.account(event, session)
         if account is None:
             return "无法在当前会话创建账户。"
-        group_bank = stock.group.item(stock.id, session).one_or_none()
-        if (group_bank is None or group_bank.n <= 0) and not (market := stock.market(session, limit)):
-            return "没有符合要求的出售信息"
+        group_bank: GroupBank | None = stock.group.item(stock.id, session).one_or_none()  # type: ignore
+        if group_bank is None or group_bank.n <= 0:
+            return "已售空，请等待结算。"
         level = account.group.level
         my_std_bank = STD_GOLD.bank(account, session)
         my_gold_bank = GOLD.bank(account, session)
+
         std_total = my_std_bank.n + my_gold_bank.n * level
         std_cost = 0
         buy_n = 0
-        quote_current: float = 0
-        for exchange in market:
-            _buy = (std_total - std_cost) / exchange.quote
-            if _buy >= exchange.n:
-                buy_n += exchange.n
-                quote_current = exchange.quote
-                std_gold_n = int(exchange.n * quote_current)
-                buy_count = exchange.deal(buy_count, session)
-                bank = exchange.user.item(STD_GOLD.id, session).one_or_none() or UserBank(item_id=STD_GOLD.id, bound_id=exchange.user_id)
-                bank.n += std_gold_n
-                std_cost += std_gold_n
-                session.add(bank)
-            else:
-                exchange_n = int(_buy)
-                buy_n += exchange_n
-                quote_current = exchange.quote
-                std_gold_n = int(exchange_n * quote_current)
-                exchange.deal(exchange_n, session)
-                bank = exchange.user.item(STD_GOLD.id, session).one_or_none() or UserBank(item_id=STD_GOLD.id, bound_id=exchange.user_id)
-                bank.n += std_gold_n
-                std_cost += std_gold_n
-                session.add(bank)
+
+        stock_value = stock.value
+        stock_floating = stock.floating
+        stock_issuance = stock.issuance
+        n = group_bank.n
+        quote = quote if quote > 0 else float("inf")
+        for _ in range(buy_count):
+            if price > quote:
                 break
-            if buy_count <= 0:
+            buy_n += 1
+            std_cost += price
+            if buy_n > n:
                 break
-        else:
-            if group_bank is not None and buy_count > 0 and (price := stock.price) > 0:
-                growth_rate = 1 / stock.issuance
-                for _ in range(buy_count):
-                    quote_current = max(quote_current, price)
-                    std_cost += quote_current
-                    if std_cost > std_total:
-                        std_cost -= quote_current
-                        break
-                    price += price * growth_rate
-                    buy_n += 1
+            if std_cost > std_total:
+                buy_n -= 1
+                std_cost -= price
+                break
+            stock_value += price
+            price = max(stock_value, stock_floating) / stock_issuance
+        std_cost = math.ceil(std_cost)
+
+        stock.corp_deal(stock.group, -buy_n, session)
+        stock.deal(account, buy_n, session)
+        STD_GOLD.corp_deal(stock.group, std_cost, session)
+
         std_cost = math.ceil(std_cost)
         tip = f"【购买:{stock_name}】使用了 {std_cost} 枚 {STD_GOLD.name}"
         if std_cost < my_std_bank.n:
@@ -343,22 +335,24 @@ async def _(event: Event):
                 session.delete(_bank)
             if std_cost > 0:
                 my_gold_bank.n -= math.ceil(std_cost / level)
+                if my_gold_bank.n < 0:
+                    my_gold_bank.n = 0
                 session.add(my_gold_bank)
                 tip += f"，其中{std_cost}枚来自购买群账户，汇率（{level}）"
         account.user.post_message(tip)
         session.commit()
     if buy_n > 0:
         card_template(
-            f"{stock_name}\n----\n数量：{buy_n}\n单价：{buy_n / std_cost :2f}\n总计：{std_cost}",
+            f"{stock_name}\n----\n数量：{buy_n}\n单价：{std_cost / buy_n :.2f}\n总计：{std_cost}",
             "购买信息",
             bg_color="white",
             width=440,
         ).save((output := BytesIO()), format="png")
         return output
-    return "你没有足够的金币"
+    return "购买失败：可能是报价过低或没有足够的金币。"
 
 
-@plugin.handle(["出售", "卖出", "结算"], ["user_id"])
+@plugin.handle(["出售", "卖出", "结算"], ["user_id", "group_id", "nickname"])
 async def _(event: Event):
     if not (args := event.args_parse()):
         return
@@ -403,12 +397,13 @@ async def _(event: Event):
 
 @plugin.handle(["市场信息"], ["user_id"])
 async def _(event: Event):
-    if stock_name := event.message:
+    if stock_name := event.single_arg():
         with manager.db.session as session:
             if (stock := Stock.find(stock_name, session)) is None:
                 return f"没有 {stock_name} 的注册信息"
-            exchanges = stock.market(session)
-            exchanges = exchanges[:20]
+            exchanges = stock.market(session, limit=20)
+            if not exchanges:
+                return "没有交易信息。"
             avatar_urls, infos = zip(*((e.user.avatar_url, f"报价：{e.quote}[pixel 580]数量：{e.n}") for e in exchanges))
         avatars = await asyncio.gather(*(download_url(avatar, client) for avatar in avatar_urls))
         imagelist = avatar_list(zip(avatars, infos))
@@ -420,7 +415,7 @@ async def _(event: Event):
                 return "市场为空"
             data.sort(key=lambda x: x[0].value, reverse=True)
             stock_card_info = stock_card(data)
-    imagelist = [card_template(stock_card_info, "市场信息")]
+        imagelist = [card_template(stock_card_info, "市场信息")]
     return manager.info_card(imagelist, event.user_id)
 
 
@@ -478,7 +473,7 @@ def stock_update():
     with manager.db.session as session:
         stocks = session.exec(Stock.select()).all()
         for stock in stocks:
-            wealths = manager.group_wealths(stock.group_id, GOLD.id, session)
+            wealths = manager.group_wealths(stock.group, GOLD.id, session)
             level = stock.group.level
             stock_value = sum(wealths) * level
             std_bank = session.exec(GroupBank.select_item(stock.group_id, STD_GOLD.id)).one_or_none()
@@ -533,8 +528,9 @@ def stock_update():
                 record = [(0.0, 0.0) for _ in range(720)]
             record.append((now_time, floating / issuance))
             record = record[-720:]
-            stock.extra["stock_record"] = record
+            stock.extra["record"] = record
             logger.info(f"{stock.name} 更新成功！")
+        session.commit()
 
 
 @plugin.handle(["刷新市场"], ["permission"], rule=Rule.superuser)

@@ -21,7 +21,7 @@ config_data.update(__config__.model_dump())
 
 gacha_gold = __config__.gacha_gold
 packet_gold = __config__.packet_gold
-luckey_min, luckey_max = __config__.luckey_coin
+luckey_coin_limit = __config__.luckey_coin_limit
 ticket_price = gacha_gold * 50
 
 
@@ -122,11 +122,9 @@ async def recv_red_packet(event: Event, handle: TempHandle):
 def _(account: Account, session: Session, item: Item, count: int, extra: str):
     info = []
     bet_item = manager.items_library.get(extra.strip(), GOLD)
-    if count < luckey_min:
-        count = luckey_min
-    elif count > luckey_max:
-        info.append(f"不要过于依赖幸运哦!\n已将数量调整为{luckey_max}个")
-        count = luckey_max
+    if count > luckey_coin_limit:
+        info.append(f"不要过于依赖幸运哦!\n已将数量调整为{luckey_coin_limit}个")
+        count = luckey_coin_limit
     bank = bet_item.bank(account, session)
     if random.randint(0, 1) == 0:
         if bank.n == 0:

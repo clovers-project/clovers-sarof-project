@@ -123,16 +123,13 @@ class Manager:
         receiver_name = receiver_account.name or receiver_account.user.name or receiver_account.user_id
         return True, f"{sender_name} 向 {receiver_name} 赠送了{unsettled}个{item.name}"
 
-    def group_wealths(self, group_name: str, item_id: str, session: Session) -> list[int]:
+    def group_wealths(self, group: Group, item_id: str, session: Session) -> list[int]:
         """
         群内总资产
         """
         wealths: list[int] = []
         item = self.items_library[item_id]
-        group = Group.find(group_name, session)
-        if group is None:
-            return wealths
-        if item.domain == 2:
+        if item.domain == 1:
             group_id = group.id
             query = AccountBank.select().join(Account).where(AccountBank.item_id == item_id, Account.group_id == group_id)
             wealths.extend(b.n for b in session.exec(query).all())
@@ -142,7 +139,7 @@ class Manager:
         return wealths
 
     def stock_data(self, invest: Sequence[BaseBank], session: Session):
-        banks = {bank.item_id[6:]: bank.n for bank in invest if bank.item_id.startswith("stock:")}
+        banks = {bank.item_id: bank.n for bank in invest if bank.item_id.startswith("stock:")}
         stocks = session.exec(Stock.select().where(Stock.id.in_(banks.keys()))).all()  # type: ignore
         return [(stock, banks.get(stock.id, 0)) for stock in stocks]
 
@@ -169,7 +166,7 @@ class Manager:
                 if n > 0 and (item := self.items_library.get(item_id)):
                     items.append((item, n))
             elif item_id.startswith("stock:"):
-                banks[item_id[6:]] = n
+                banks[item_id] = n
             else:
                 pass
         stocks = session.exec(Stock.select().where(Stock.id.in_(banks.keys()))).all()  # type: ignore

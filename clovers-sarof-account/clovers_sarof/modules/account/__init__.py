@@ -155,7 +155,7 @@ async def _(event: Event):
         user = account.user
         avatar_url = user.avatar_url
         nickname = account.nickname
-        dist_lines = []
+        dist_lines: list[str] = []
         dist: list[tuple[int, str]] = [((sum_std_n := STD_GOLD.bank(account, session).n), "个人账户")]
         for _account in user.accounts:
             _group = _account.group
@@ -166,13 +166,15 @@ async def _(event: Event):
         dist_lines.append(f"[font color=#FFCC33]金币 {format_number(sum_std_n)}")
         if stock_data := manager.stock_data(user.bank, session):
             stock_value = format_number(manager.stock_value(stock_data, session))
+            stock_card_info = stock_card(stock_data)
         else:
+            stock_card_info = None
             stock_value = "0"
         dist_lines.append(f"[font color=#0066CC]股票 {stock_value}")
         for marking_item in manager.marking_library.values():
             if (n := marking_item.bank(account, session).n) > 0:
                 dist_lines.append(f"[font color={marking_item.color}]Lv.{min(n, 99)}[pixel 160]{marking_item.tip}")
-        message_lines = []
+        message_lines: list[str] = []
         if account.sign_in is None:
             message_lines.append(f"[font color=red]未注册")
         elif (delta_days := (datetime.today() - account.sign_in).days) == 0:
@@ -186,8 +188,8 @@ async def _(event: Event):
     imagelist: ImageList = []
     imagelist.append(avatar_card(await download_url(avatar_url, client), nickname, marking_lines))
     imagelist.append(text_to_image("\n".join(dist_lines), 40, canvas=dist_card(dist) if dist else None))
-    if stock_data:
-        imagelist.append(card_template(stock_card(stock_data), "股票信息"))
+    if stock_card_info is not None:
+        imagelist.append(card_template(stock_card_info, "股票信息"))
     imagelist.append(card_template("\n".join(message_lines), "Message", font_size=30, autowrap=True))
     return manager.info_card(imagelist, event.user_id)
 

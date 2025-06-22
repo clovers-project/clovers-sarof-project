@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 class Config(BaseModel):
     # 主路径
-    path: str = "./LeafGames"
+    path: str = "./data/LeafGames"
     # 默认显示字体
     fontname: str = "simsun"
     # 默认备用字体

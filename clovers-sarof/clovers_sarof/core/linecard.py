@@ -21,6 +21,14 @@ assert _ is not None
 FONT_DEFAULT, _ = _
 
 
+def create_circle_mask(size: int, ssaa: int = 2):
+    h_size = size * ssaa
+    edge = ssaa // 2
+    circle_mask = Image.new("L", (h_size, h_size), 0)
+    ImageDraw.Draw(circle_mask).ellipse(((edge, edge), (h_size - edge, h_size - edge)), fill=255)
+    return circle_mask.resize((size, size), Image.Resampling.LANCZOS)
+
+
 def text_to_image(text: str, font_size=40, width=880, **kwargs):
     return linecard(text, font_size=font_size, width=width, **kwargs)
 
@@ -67,15 +75,15 @@ def stock_card(data: list[tuple[Stock, int]]):
     return "\n".join(result(*args) for args in data)
 
 
-CIRCLE_260_MASK = Image.new("RGBA", (260, 260), (255, 255, 255, 0))
-ImageDraw.Draw(CIRCLE_260_MASK).ellipse(((0, 0), (260, 260)), fill="black")
+CIRCLE_260_MASK = create_circle_mask(260)
 
 
 def avatar_card(avatar: bytes | None, nickname: str, lines: list[str] | None = None):
     # assert len(lines) <= 3
     canvas = Image.new("RGBA", (880, 300))
     if avatar:
-        canvas.paste(Image.open(BytesIO(avatar)).resize((260, 260)), (20, 20), CIRCLE_260_MASK)
+        (avatar_image := Image.open(BytesIO(avatar)).resize((260, 260))).putalpha(CIRCLE_260_MASK)
+        canvas.paste(avatar_image, (20, 20))
     draw = ImageDraw.Draw(canvas)
     canvas.paste(linecard(nickname, 40, width=580, padding=(0, 10)), (300, 40))
     draw.line(((300, 120), (860, 120)), fill="gray", width=4)
@@ -184,8 +192,7 @@ def dist_card(
     return canvas
 
 
-CIRCLE_60_MASK = Image.new("RGBA", (60, 60), (255, 255, 255, 0))
-ImageDraw.Draw(CIRCLE_60_MASK).ellipse(((0, 0), (60, 60)), fill="black")
+CIRCLE_60_MASK = create_circle_mask(60)
 
 
 def avatar_list(data: Iterable[tuple[bytes | None, str]]) -> ImageList:
@@ -193,6 +200,7 @@ def avatar_list(data: Iterable[tuple[bytes | None, str]]) -> ImageList:
     for avatar, text in data:
         canvas = linecard(f"[pixel 70]{text}", 40, width=880, height=70, padding=(0, 15))
         if avatar:
-            canvas.paste(Image.open(BytesIO(avatar)).resize((60, 60)), (5, 5), CIRCLE_60_MASK)
+            (avatar_image := Image.open(BytesIO(avatar)).resize((60, 60))).putalpha(CIRCLE_60_MASK)
+            canvas.paste(avatar_image, (5, 5))
         image_list.append(canvas)
     return image_list

@@ -1,10 +1,10 @@
 from typing import Any, ClassVar
 from datetime import datetime
-from sqlmodel import SQLModel as BaseSQLModel, Session, select
+from sqlmodel import SQLModel as BaseSQLModel, Session, select, asc
 from sqlmodel import Field, Relationship
 from sqlmodel import create_engine, col
 from sqlalchemy import Column
-from sqlalchemy.ext.mutable import MutableDict
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.dialects.sqlite import JSON as SQLiteJSON
 
 
@@ -35,7 +35,8 @@ class BaseItem:
             return bank.n
         bank.n += unsettled
         if bank.n <= 0:
-            session.delete(bank)
+            if bank in session:
+                session.delete(bank)
         else:
             session.add(bank)
         session.commit()
@@ -120,22 +121,14 @@ class Stock(BaseItem, Entity, table=True):
     def bank(self, account: "Account", session: Session):
         return account.user.item(self.id, session).one_or_none() or UserBank(item_id=self.id, bound_id=account.user_id)
 
-    def market(self, session: Session, quote: float = 0):
-        query = Exchange.select_item(bound_id=self.group_id, item_id=self.id)
-        if quote <= 0:
-            query = select(Exchange).where(
-                Exchange.bound_id == self.group_id,
-                Exchange.item_id == self.id,
-                Exchange.quote > 0.0,
-            )
-        else:
-            query = select(Exchange).where(
-                Exchange.bound_id == self.group_id,
-                Exchange.item_id == self.id,
-                Exchange.quote <= quote,
-                Exchange.quote > 0.0,
-            )
-        return session.exec(query.order_by(col(Exchange.quote).asc())).all()
+    def market(self, session: Session, quote: float = 0, limit: int = 0):
+        query = select(Exchange).where(Exchange.bound_id == self.id, Exchange.item_id == self.id, Exchange.quote > 0.0)
+        if quote > 0:
+            query = query.where(Exchange.quote <= quote)
+        query = query.order_by(asc(Exchange.quote))
+        if limit > 0:
+            query = query.limit(limit)
+        return session.exec(query).all()
 
     @property
     def price(self):
@@ -185,11 +178,10 @@ class User(Entity, table=True):
     avatar_url: str = ""
     connect: str = ""
     extra: dict[str, Any] = Field(default_factory=dict, sa_column=Column(MutableDict.as_mutable(SQLiteJSON())))
-    mailbox: list[str] = Field(default_factory=list, sa_column=Column(SQLiteJSON()))
+    mailbox: list[str] = Field(default_factory=list, sa_column=Column(MutableList.as_mutable(SQLiteJSON())))
 
     def post_message(self, message: str, history: int = 30):
-        self.mailbox.append(message)
-        self.mailbox = self.mailbox[-history:]
+        self.mailbox = [*self.mailbox, message][-history:]
 
 
 class GroupBank(BaseBank, table=True):

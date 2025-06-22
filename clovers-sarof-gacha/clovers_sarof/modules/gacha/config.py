@@ -7,4 +7,4 @@ class Config(BaseModel):
     # 礼包金币范围
     packet_gold: tuple[int, int] = (200, 2000)
     # 幸运硬币赌注范围
-    luckey_coin: tuple[int, int] = (2000, 100000)
+    luckey_coin_limit: int = 100000
